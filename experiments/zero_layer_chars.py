@@ -1,5 +1,6 @@
 import os
 import time
+from functools import partial
 
 import torch
 import torch.nn as nn
@@ -79,29 +80,19 @@ class CharDataset(Dataset):
         return x, y
 
 
-# def validate(trainer, dataset, writer):
-#     model = trainer.model
-#     model.eval()
-
-#     # compute the loss on the validation set
-#     val_loader = DataLoader(dataset, batch_size=1, shuffle=False)
-
-#     val_loss = 0
-#     for x, y in val_loader:
-#         x = x.to(trainer.device)
-#         y = y.to(trainer.device)
-#         _, loss = model(x, y)
-#         val_loss += loss.item()
+def batch_end_callback(trainer, writer, config):
+    if trainer.iter_num % 10 == 0:
+        # log training loss
+        writer.add_scalar('train_loss', trainer.loss, trainer.iter_num)
     
-#     val_loss /= len(val_loader)
+    if trainer.iter_num % 10000 == 0:
+        print('saving latest model at iter', trainer.iter_num)
+        # save the latest model
+        ckpt_path = os.path.join(config.system.work_dir, f"latest_model_{trainer.iter_num}.pt")
+        torch.save(trainer.model.state_dict(), ckpt_path)
 
-#     # log the validation loss
-#     writer.add_scalar('val_loss', val_loss, trainer.iter_num)
-    
-#     model.train()
 
-
-if __name__=="__main__":
+def train():
     config = get_config()
     print(config)
 
@@ -113,33 +104,23 @@ if __name__=="__main__":
 
     # validate on the first 1000 characters, train on the rest
     train_text = open('../data/tiny_shakespeare.txt', 'r').read()
-    train_dataset = CharDataset(config.data, train_text[1000:])
-    val_dataset = CharDataset(config.data, train_text[:1000])
+    train_dataset = CharDataset(config.data, train_text)
 
     # construct the model
     config.model.vocab_size = train_dataset.get_vocab_size()
     config.model.block_size = train_dataset.get_block_size()
     model = ZeroLayerTransformer(config.model)
 
-    # construct the trainer object
+    # construct the trainer
     trainer = Trainer(config.trainer, model, train_dataset)
 
-    def batch_end_callback(trainer):
-        if trainer.iter_num % 10 == 0:
-            # log training loss
-            writer.add_scalar('train_loss', trainer.loss, trainer.iter_num)
-            # print(f"iter {trainer.iter_num} train loss: {trainer.loss}")
-        
-        # if trainer.iter_num % 1000 == 0:
-        #     # validate
-        #     validate(trainer=trainer, dataset=val_dataset, writer=writer)
-        
-        if trainer.iter_num % 10000 == 0:
-            print('saving latest model at iter', trainer.iter_num)
-            # save the latest model
-            ckpt_path = os.path.join(config.system.work_dir, f"latest_model_{trainer.iter_num}.pt")
-            torch.save(trainer.model.state_dict(), ckpt_path)
-
-    trainer.add_callback('on_batch_end', batch_end_callback)
+    trainer.add_callback(
+        'on_batch_end',
+        partial(batch_end_callback, writer=writer, config=config)
+    )
 
     trainer.run()
+
+
+if __name__=="__main__":
+    train()

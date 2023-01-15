@@ -1,11 +1,15 @@
 import os
 import time
 from functools import partial
+import numpy as np
+import matplotlib.pyplot as plt
+
+# for cli args
+import argparse
 
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from torch.utils.data.dataloader import DataLoader
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -23,9 +27,6 @@ def get_config():
     C.system = CN()
     C.system.seed = 3407
     C.system.work_dir = './out/zero_layer_chars'
-
-    # data
-    C.data = CharDataset.get_default_config()
 
     # model
     C.model = ZeroLayerTransformer.get_default_config()
@@ -48,7 +49,9 @@ class CharDataset(Dataset):
         C.block_size = 32
         return C
 
-    def __init__(self, config, data):
+    def __init__(self, data, config=None):
+        if config is None:
+            config = self.get_default_config()
         self.config = config
 
         chars = sorted(list(set(data)))
@@ -104,7 +107,7 @@ def train():
 
     # validate on the first 1000 characters, train on the rest
     train_text = open('../data/tiny_shakespeare.txt', 'r').read()
-    train_dataset = CharDataset(config.data, train_text)
+    train_dataset = CharDataset(data=train_text)
 
     # construct the model
     config.model.vocab_size = train_dataset.get_vocab_size()
@@ -120,7 +123,75 @@ def train():
     )
 
     trainer.run()
+    writer.close()
+
+
+def compute_ngram_counts(document):
+    ngram_counts = {}
+    prev = None
+    for char in document:
+        if prev is not None:
+            ngram = prev + char
+            if ngram in ngram_counts:
+                ngram_counts[ngram] += 1
+            else:
+                ngram_counts[ngram] = 1
+        prev = char
+    return ngram_counts
+
+
+def analyse(model_paths):
+
+    # load dataset
+    with open('../data/tiny_shakespeare.txt', 'r') as f:
+        data = f.read()
+    dataset = CharDataset(data=data)
+    actual_ngram_counts = compute_ngram_counts(data)
+
+    # fill out the actual ngram matrix
+    actual_ngram_matrix = np.zeros((dataset.vocab_size, dataset.vocab_size))
+    for i in range(dataset.vocab_size):
+        for j in range(dataset.vocab_size):
+            ngram = dataset.itos[i] + dataset.itos[j]
+            if ngram in actual_ngram_counts:
+                actual_ngram_matrix[i,j] = actual_ngram_counts[ngram]
+    
+    # normalise the rows
+    actual_ngram_matrix = actual_ngram_matrix / np.sum(actual_ngram_matrix, axis=1, keepdims=True)
+
+    kl_divergences = []
+    for model_path in model_paths:
+        # inspect model weights
+        state_dict = torch.load(model_path)
+        embedding_weights = state_dict['embedding.weight']
+        output_weights = state_dict['unembedding.weight']
+
+        ngram_logits = torch.matmul(embedding_weights, output_weights.T)
+        ngram_probs = torch.softmax(ngram_logits, dim=1).to('cpu').numpy()
+
+        # compute the KL divergence
+        actual_ngram_matrix[actual_ngram_matrix == 0] = 1e-10 # avoid log(0)
+        kl_divergence = np.sum(actual_ngram_matrix * np.log(actual_ngram_matrix / ngram_probs))
+
+        print('KL divergence from predicted to actual probs:', kl_divergence)
+        kl_divergences.append(kl_divergence)
+    
+    plt.plot(kl_divergences)
+    plt.show()
 
 
 if __name__=="__main__":
-    train()
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--train', action='store_true')
+    parser.add_argument('--model_path', type=str, default=None)
+    parser.set_defaults(train=False)
+    args = parser.parse_args()
+
+    if args.train:
+        train()
+    else:
+        models_dir = "./out/zero_layer_chars"
+        model_paths = [os.path.join(models_dir, f"latest_model_{i}.pt") for i in range(0, 170000, 10000)]
+        analyse(model_paths=model_paths)
+    

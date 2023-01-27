@@ -3,10 +3,13 @@ Training loop from Karpathy's minGPT
 """
 
 import time
+import os
 from collections import defaultdict
 
+import numpy as np
 import torch
 from torch.utils.data.dataloader import DataLoader
+
 from yacs.config import CfgNode as CN
 
 
@@ -28,12 +31,15 @@ class Trainer:
         C.grad_norm_clip = 1.0
         return C
 
-    def __init__(self, config, model, train_dataset):
+    def __init__(self, config, model, data_dir):
         self.config = config
         self.model = model
         self.optimizer = None
-        self.train_dataset = train_dataset
+        # self.train_dataset = train_dataset
         self.callbacks = defaultdict(list)
+
+        self.train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.uint16, mode='r')
+        self.val_data = np.memmap(os.path.join(data_dir, 'val.bin'), dtype=np.uint16, mode='r')
 
         # determine the device we'll train on
         if config.device == 'auto':
@@ -43,10 +49,21 @@ class Trainer:
         self.model = self.model.to(self.device)
         print("running on device", self.device)
 
+        self.batch_size = config.batch_size
+        self.block_size = config.block_size
+
         # variables that will be assigned to trainer class later for logging and etc
         self.iter_num = 0
         self.iter_time = 0.0
         self.iter_dt = 0.0
+    
+    def get_batch(self, split):
+        data = self.train_data if split == 'train' else self.val_data
+        ix = torch.randint(len(data) - self.block_size, (self.batch_size,))
+        x = torch.stack([torch.from_numpy((data[i:i+self.block_size]).astype(np.int64)) for i in ix])
+        y = torch.stack([torch.from_numpy((data[i+1:i+1+self.block_size]).astype(np.int64)) for i in ix])
+        x, y = x.to(self.device), y.to(self.device)
+        return x, y
 
     def add_callback(self, onevent: str, callback):
         self.callbacks[onevent].append(callback)
@@ -64,30 +81,12 @@ class Trainer:
         # setup the optimizer
         self.optimizer = model.configure_optimizers(config)
 
-        # setup the dataloader
-        train_loader = DataLoader(
-            self.train_dataset,
-            sampler=torch.utils.data.RandomSampler(self.train_dataset, replacement=True, num_samples=int(1e10)),
-            shuffle=False,
-            pin_memory=True,
-            batch_size=config.batch_size,
-            num_workers=config.num_workers,
-        )
-
         model.train()
         self.iter_num = 0
         self.iter_time = time.time()
-        data_iter = iter(train_loader)
-        while True:
 
-            # fetch the next batch (x, y) and re-init iterator if needed
-            try:
-                batch = next(data_iter)
-            except StopIteration:
-                data_iter = iter(train_loader)
-                batch = next(data_iter)
-            batch = [t.to(self.device) for t in batch]
-            x, y = batch
+        while True:
+            x, y = self.get_batch('train')
 
             # forward the model
             logits, self.loss = model(x, y)

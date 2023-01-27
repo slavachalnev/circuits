@@ -1,10 +1,10 @@
 import os
 import time
+import pickle
 from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
 
-# for cli args
 import argparse
 
 import torch
@@ -35,52 +35,38 @@ def get_config():
     # trainer
     C.trainer = Trainer.get_default_config()
     C.trainer.learning_rate = 1e-4
+    C.trainer.block_size = 128
     return C
 
 
-class CharDataset(Dataset):
-    """
-    Emits batches of characters
-    """
+def prep_data(data_dir, data):
+    chars = sorted(list(set(data)))
+    vocab_size = len(chars)
 
-    @staticmethod
-    def get_default_config():
-        C = CN()
-        C.block_size = 32
-        return C
+    stoi = { ch:i for i,ch in enumerate(chars) }
+    itos = { i:ch for i,ch in enumerate(chars) }
 
-    def __init__(self, data, config=None):
-        if config is None:
-            config = self.get_default_config()
-        self.config = config
+    # create the train and test splits
+    n = len(data)
+    train_data = data[:int(n*0.9)]
+    val_data = data[int(n*0.9):]
 
-        chars = sorted(list(set(data)))
-        data_size, vocab_size = len(data), len(chars)
-        print('data has %d characters, %d unique.' % (data_size, vocab_size))
+    train_ids = [stoi[c] for c in train_data]
+    val_ids = [stoi[c] for c in val_data]
 
-        self.stoi = { ch:i for i,ch in enumerate(chars) }
-        self.itos = { i:ch for i,ch in enumerate(chars) }
-        self.vocab_size = vocab_size
-        self.data = data
+    # save the data
+    train_ids = np.array(train_ids, dtype=np.uint16)
+    val_ids = np.array(val_ids, dtype=np.uint16)
+    train_ids.tofile(os.path.join(data_dir, 'train.bin'))
+    val_ids.tofile(os.path.join(data_dir, 'val.bin'))
 
-    def get_vocab_size(self):
-        return self.vocab_size
-
-    def get_block_size(self):
-        return self.config.block_size
-
-    def __len__(self):
-        return len(self.data) - self.config.block_size
-
-    def __getitem__(self, idx):
-        # grab a chunk of (block_size + 1) characters from the data
-        chunk = self.data[idx:idx + self.config.block_size + 1]
-        # encode every character to an integer
-        dix = [self.stoi[s] for s in chunk]
-        # return as tensors
-        x = torch.tensor(dix[:-1], dtype=torch.long)
-        y = torch.tensor(dix[1:], dtype=torch.long)
-        return x, y
+    meta = {
+        'vocab_size': vocab_size,
+        'itos': itos,
+        'stoi': stoi,
+    }
+    with open(os.path.join(data_dir, 'meta.pkl'), 'wb') as f:
+        pickle.dump(meta, f)
 
 
 def batch_end_callback(trainer, writer, config):
@@ -105,17 +91,24 @@ def train():
     # new writer for each run based on time
     writer = SummaryWriter(os.path.join(config.system.work_dir, 'tensorboard', time.strftime("%Y-%m-%d_%H-%M-%S")))
 
-    # validate on the first 1000 characters, train on the rest
-    train_text = open('../data/tiny_shakespeare.txt', 'r').read()
-    train_dataset = CharDataset(data=train_text)
+    text = open('../data/tiny_shakespeare.txt', 'r').read()
+    data_dir = os.path.join("../data", "shakespeare_chars")
+    # prep data
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+        prep_data(data_dir=data_dir, data=text)
+    
+    # load dataset metadata
+    meta_path = os.path.join(data_dir, 'meta.pkl')
+    meta = pickle.load(open(meta_path, 'rb'))
 
     # construct the model
-    config.model.vocab_size = train_dataset.get_vocab_size()
-    config.model.block_size = train_dataset.get_block_size()
+    config.model.vocab_size = vocab_size = meta['vocab_size']
+    config.model.block_size = config.trainer.block_size
     model = ZeroLayerTransformer(config.model)
 
     # construct the trainer
-    trainer = Trainer(config.trainer, model, train_dataset)
+    trainer = Trainer(config.trainer, model, data_dir=data_dir)
 
     trainer.add_callback(
         'on_batch_end',
@@ -126,12 +119,12 @@ def train():
     writer.close()
 
 
-def compute_ngram_counts(document):
+def compute_ngram_counts(data):
     ngram_counts = {}
     prev = None
-    for char in document:
+    for char in data:
         if prev is not None:
-            ngram = prev + char
+            ngram = (prev, char)
             if ngram in ngram_counts:
                 ngram_counts[ngram] += 1
             else:
@@ -140,21 +133,20 @@ def compute_ngram_counts(document):
     return ngram_counts
 
 
-def analyse(model_paths):
-
+def analyse(model_paths, data_dir):
     # load dataset
-    with open('../data/tiny_shakespeare.txt', 'r') as f:
-        data = f.read()
-    dataset = CharDataset(data=data)
-    actual_ngram_counts = compute_ngram_counts(data)
+    meta = pickle.load(open(os.path.join(data_dir, 'meta.pkl'), 'rb'))
+    train_data = np.memmap(os.path.join(data_dir, 'train.bin'), dtype=np.uint16, mode='r')
+
+    actual_ngram_counts = compute_ngram_counts(train_data)
 
     # fill out the actual ngram matrix
-    actual_ngram_matrix = np.zeros((dataset.vocab_size, dataset.vocab_size))
-    for i in range(dataset.vocab_size):
-        for j in range(dataset.vocab_size):
-            ngram = dataset.itos[i] + dataset.itos[j]
-            if ngram in actual_ngram_counts:
-                actual_ngram_matrix[i,j] = actual_ngram_counts[ngram]
+    vocab_size = meta['vocab_size']
+    actual_ngram_matrix = np.zeros((vocab_size, vocab_size))
+    for i in range(vocab_size):
+        for j in range(vocab_size):
+            if (i, j) in actual_ngram_counts:
+                actual_ngram_matrix[i,j] = actual_ngram_counts[(i, j)]
     
     # normalise the rows
     actual_ngram_matrix = actual_ngram_matrix / np.sum(actual_ngram_matrix, axis=1, keepdims=True)
@@ -192,6 +184,6 @@ if __name__=="__main__":
         train()
     else:
         models_dir = "./out/zero_layer_chars"
-        model_paths = [os.path.join(models_dir, f"latest_model_{i}.pt") for i in range(0, 170000, 10000)]
-        analyse(model_paths=model_paths)
+        model_paths = [os.path.join(models_dir, f"latest_model_{i}.pt") for i in range(0, 70000, 10000)]
+        analyse(model_paths=model_paths, data_dir="../data/shakespeare_chars")
     

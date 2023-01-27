@@ -10,7 +10,7 @@ import tiktoken
 
 from torch.utils.tensorboard import SummaryWriter
 
-from circuits.models.zero_layer import ZeroLayerTransformer
+from circuits.models.one_attn_layer import OneLayerAttnTransformer
 from circuits.train.trainer import Trainer
 from circuits.train.utils import set_seed, setup_logging
 
@@ -23,17 +23,17 @@ def get_config():
     # system
     C.system = CN()
     C.system.seed = 3407
-    C.system.work_dir = './out/zero_layer_bpe'
+    C.system.work_dir = './out/one_layer_shakespeare'
 
     # model
-    C.model = ZeroLayerTransformer.get_default_config()
-    C.model.n_embd = 128
+    C.model = OneLayerAttnTransformer.get_default_config()
     C.model.vocab_size = 50257
 
     # trainer
     C.trainer = Trainer.get_default_config()
     C.trainer.learning_rate = 1e-4
-    C.trainer.block_size = 128
+    C.trainer.block_size = 256
+    C.trainer.batch_size = 32
     return C
 
 
@@ -95,7 +95,7 @@ def train():
 
     # construct the model
     config.model.block_size = config.trainer.block_size
-    model = ZeroLayerTransformer(config.model)
+    model = OneLayerAttnTransformer(config.model)
 
     # construct the trainer object
     trainer = Trainer(config.trainer, model, data_dir=data_dir)

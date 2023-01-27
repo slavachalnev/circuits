@@ -39,7 +39,10 @@ def get_config():
     return C
 
 
-def prep_data(data_dir, data):
+def prep_data(data_dir):
+    with open('../data/tiny_shakespeare.txt', 'r') as f:
+        data = f.read()
+
     chars = sorted(list(set(data)))
     vocab_size = len(chars)
 
@@ -91,19 +94,18 @@ def train():
     # new writer for each run based on time
     writer = SummaryWriter(os.path.join(config.system.work_dir, 'tensorboard', time.strftime("%Y-%m-%d_%H-%M-%S")))
 
-    text = open('../data/tiny_shakespeare.txt', 'r').read()
     data_dir = os.path.join("../data", "shakespeare_chars")
     # prep data
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
-        prep_data(data_dir=data_dir, data=text)
+        prep_data(data_dir=data_dir)
     
     # load dataset metadata
     meta_path = os.path.join(data_dir, 'meta.pkl')
     meta = pickle.load(open(meta_path, 'rb'))
 
     # construct the model
-    config.model.vocab_size = vocab_size = meta['vocab_size']
+    config.model.vocab_size = meta['vocab_size']
     config.model.block_size = config.trainer.block_size
     model = ZeroLayerTransformer(config.model)
 

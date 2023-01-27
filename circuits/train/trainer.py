@@ -106,3 +106,12 @@ class Trainer:
             # termination conditions
             if config.max_iters is not None and self.iter_num >= config.max_iters:
                 break
+    
+    def validate(self):
+        self.model.eval()
+        with torch.no_grad():
+            x, y = self.get_batch('val')
+            logits, self.loss = self.model(x, y)
+        self.model.train()
+        return self.loss.item()
+    

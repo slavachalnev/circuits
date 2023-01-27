@@ -63,6 +63,12 @@ def batch_end_callback(trainer, writer, config):
         # log training loss
         writer.add_scalar('train_loss', trainer.loss, trainer.iter_num)
         # print(f"iter {trainer.iter_num} train loss: {trainer.loss}")
+
+    if trainer.iter_num % 100 == 0:
+        # log validation loss
+        val_loss = trainer.validate()
+        writer.add_scalar('val_loss', val_loss, trainer.iter_num)
+        print(f"iter {trainer.iter_num} val loss: {val_loss}")
     
     if trainer.iter_num % 10000 == 0:
         print('saving latest model at iter', trainer.iter_num)

@@ -23,7 +23,7 @@ def get_config():
     # system
     C.system = CN()
     C.system.seed = 3407
-    C.system.work_dir = './out/one_layer_shakespeare'
+    C.system.work_dir = './out/one_layer_openwebtext'
 
     # model
     C.model = OneLayerAttnTransformer.get_default_config()
@@ -31,46 +31,24 @@ def get_config():
 
     # trainer
     C.trainer = Trainer.get_default_config()
-    C.trainer.learning_rate = 1e-4
     C.trainer.block_size = 256
     C.trainer.batch_size = 32
     return C
-
-
-def prep_data(data_dir):
-    with open('../data/tiny_shakespeare.txt', 'r') as f:
-        data = f.read()
-    n = len(data)
-    train_data = data[:int(n*0.9)]
-    val_data = data[int(n*0.9):]
-
-    # encode with tiktoken gpt2 bpe
-    enc = tiktoken.get_encoding("gpt2")
-    train_ids = enc.encode_ordinary(train_data)
-    val_ids = enc.encode_ordinary(val_data)
-    print(f"train has {len(train_ids):,} tokens")
-    print(f"val has {len(val_ids):,} tokens")
-
-    # export to bin files
-    train_ids = np.array(train_ids, dtype=np.uint16)
-    val_ids = np.array(val_ids, dtype=np.uint16)
-    train_ids.tofile(os.path.join(data_dir, 'train.bin'))
-    val_ids.tofile(os.path.join(data_dir, 'val.bin'))
 
 
 def batch_end_callback(trainer, writer, config):
     if trainer.iter_num % 10 == 0:
         # log training loss
         writer.add_scalar('train_loss', trainer.loss, trainer.iter_num)
-        # print(f"iter {trainer.iter_num} train loss: {trainer.loss}")
+        writer.add_scalar('learning_rate', trainer.current_lr, trainer.iter_num)
 
-    if trainer.iter_num % 100 == 0:
+    if trainer.iter_num % 500 == 0:
         # log validation loss
         val_loss = trainer.validate()
         writer.add_scalar('val_loss', val_loss, trainer.iter_num)
         print(f"iter {trainer.iter_num} val loss: {val_loss}")
     
-    if trainer.iter_num % 10000 == 0:
+    if trainer.iter_num % 2000 == 0:
         print('saving latest model at iter', trainer.iter_num)
         # save the latest model
         ckpt_path = os.path.join(config.system.work_dir, f"latest_model_{trainer.iter_num}.pt")
@@ -87,11 +65,9 @@ def train():
     # new writer for each run based on time
     writer = SummaryWriter(os.path.join(config.system.work_dir, 'tensorboard', time.strftime("%Y-%m-%d_%H-%M-%S")))
 
-    data_dir = os.path.join("../data", "shakespeare_bpe")
-    # prep data
+    data_dir = os.path.join("../data", "openwebtext")
     if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
-        prep_data(data_dir=data_dir)
+        raise ValueError("data not found, please run openwebtext.py")
 
     # construct the model
     config.model.block_size = config.trainer.block_size

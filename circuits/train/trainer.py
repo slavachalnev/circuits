@@ -4,6 +4,7 @@ Training loop from Karpathy's minGPT
 
 import time
 import os
+import math
 from collections import defaultdict
 
 import numpy as np
@@ -25,10 +26,15 @@ class Trainer:
         # optimizer parameters
         C.max_iters = None
         C.batch_size = 64
-        C.learning_rate = 3e-4
         C.betas = (0.9, 0.95)
         C.weight_decay = 0.1 # only applied on matmul weights
         C.grad_norm_clip = 1.0
+
+        C.learning_rate = 5e-4
+        C.decay_lr = True
+        C.warmup_iters = 1000
+        C.lr_decay_iters = 20000
+        C.min_lr = 1e-5
         return C
 
     def __init__(self, config, model, data_dir):
@@ -52,10 +58,10 @@ class Trainer:
         self.batch_size = config.batch_size
         self.block_size = config.block_size
 
-        # variables that will be assigned to trainer class later for logging and etc
         self.iter_num = 0
         self.iter_time = 0.0
         self.iter_dt = 0.0
+        self.current_lr = config.learning_rate
     
     def get_batch(self, split):
         data = self.train_data if split == 'train' else self.val_data
@@ -64,6 +70,23 @@ class Trainer:
         y = torch.stack([torch.from_numpy((data[i+1:i+1+self.block_size]).astype(np.int64)) for i in ix])
         x, y = x.to(self.device), y.to(self.device)
         return x, y
+    
+    def get_lr(self, iter):
+        warmup_iters = self.config.warmup_iters
+        learning_rate = self.config.learning_rate
+        lr_decay_iters = self.config.lr_decay_iters
+        min_lr = self.config.min_lr
+
+        if iter < warmup_iters:
+            return learning_rate * iter / warmup_iters
+
+        if iter > lr_decay_iters:
+            return min_lr
+
+        decay_ratio = (iter - warmup_iters) / (lr_decay_iters - warmup_iters)
+        assert 0 <= decay_ratio <= 1
+        coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coeff ranges 0..1
+        return min_lr + coeff * (learning_rate - min_lr)
 
     def add_callback(self, onevent: str, callback):
         self.callbacks[onevent].append(callback)
@@ -86,6 +109,13 @@ class Trainer:
         self.iter_time = time.time()
 
         while True:
+            if self.config.decay_lr:
+                self.current_lr = self.get_lr(self.iter_num)
+                for param_group in self.optimizer.param_groups:
+                    param_group['lr'] = self.current_lr
+            else:
+                self.current_lr = self.config.learning_rate
+
             x, y = self.get_batch('train')
 
             # forward the model

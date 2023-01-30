@@ -37,6 +37,8 @@ class OneLayerAttnTransformer(Model):
 
         # embedding
         self.embedding = nn.Embedding(config.vocab_size, config.n_embd)
+        self.pos_embedding = nn.Embedding(config.block_size, config.n_embd)
+
         self.attn = AttentionOnlyBlock(n_embed=config.n_embd, n_head=config.n_head)
         self.unembedding = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
@@ -48,6 +50,11 @@ class OneLayerAttnTransformer(Model):
     def forward(self, x, targets=None):
         # embedding
         x = self.embedding(x)
+
+        # position embedding
+        pos = torch.arange(0, x.size(1), device=x.device).unsqueeze(0) # shape (1, t)
+        pos_emb = self.pos_embedding(pos)
+        x = x + pos_emb
 
         # attention layer
         x = self.attn(x)

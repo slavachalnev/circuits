@@ -38,7 +38,8 @@ class AttentionOnlyBlock(nn.Module):
         self.pos = SinusoidalEncoding(d_model=n_embed, dropout=pos_pdrop, max_len=block_size)
 
     def forward(self, x):
-        h, _ = self.attn(x, x, x)
+        px = self.pos(x)
+        h, _ = self.attn(query=px, key=px, value=x)
         return x + h
 
 

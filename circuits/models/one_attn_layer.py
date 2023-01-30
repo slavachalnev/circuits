@@ -36,8 +36,10 @@ class AttentionOnlyBlock(nn.Module):
         super().__init__()
         self.attn = nn.MultiheadAttention(n_embed, num_heads=n_head, batch_first=True)
         self.pos = SinusoidalEncoding(d_model=n_embed, dropout=pos_pdrop, max_len=block_size)
+        self.ln = nn.LayerNorm(n_embed)
 
     def forward(self, x):
+        x = self.ln(x)
         px = self.pos(x)
         h, _ = self.attn(query=px, key=px, value=x)
         return x + h
@@ -64,14 +66,7 @@ class OneLayerAttnTransformer(Model):
     def __init__(self, config):
         super().__init__()
 
-        # embedding
         self.embedding = nn.Embedding(config.vocab_size, config.n_embd)
-        # self.pos_embedding = nn.Embedding(config.block_size, config.n_embd)
-        # self.pos_embedding = SinusoidalEncoding(
-        #     d_model=config.n_embd,
-        #     dropout=config.pos_embd_pdrop,
-        #     max_len=config.block_size,
-        # )
 
         self.attn = AttentionOnlyBlock(
             n_embed=config.n_embd,
@@ -79,6 +74,8 @@ class OneLayerAttnTransformer(Model):
             block_size=config.block_size,
             pos_pdrop=config.pos_embd_pdrop,
             )
+        self.ln_f = nn.LayerNorm(config.n_embd)
+        
         self.unembedding = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
         # initialize weights
@@ -100,6 +97,9 @@ class OneLayerAttnTransformer(Model):
 
         # attention layer
         x = self.attn(x)
+
+        # final layer norm
+        x = self.ln_f(x)
 
         # unembedding
         logits = self.unembedding(x)

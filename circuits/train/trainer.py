@@ -35,6 +35,8 @@ class Trainer:
         C.warmup_iters = 1000
         C.lr_decay_iters = 20000
         C.min_lr = 1e-5
+
+        C.micro_batch_size = None
         return C
 
     def __init__(self, config, model, data_dir):
@@ -62,10 +64,16 @@ class Trainer:
         self.iter_time = 0.0
         self.iter_dt = 0.0
         self.current_lr = config.learning_rate
+
+        if config.micro_batch_size is None:
+            self.micro_batch_size = self.batch_size
+        else:
+            self.micro_batch_size = config.micro_batch_size
+        self.num_micro_batches = self.batch_size // self.micro_batch_size
     
     def get_batch(self, split):
         data = self.train_data if split == 'train' else self.val_data
-        ix = torch.randint(len(data) - self.block_size, (self.batch_size,))
+        ix = torch.randint(len(data) - self.block_size, (self.micro_batch_size,))
         x = torch.stack([torch.from_numpy((data[i:i+self.block_size]).astype(np.int64)) for i in ix])
         y = torch.stack([torch.from_numpy((data[i+1:i+1+self.block_size]).astype(np.int64)) for i in ix])
         x, y = x.to(self.device), y.to(self.device)
@@ -108,6 +116,7 @@ class Trainer:
         self.iter_num = 0
         self.iter_time = time.time()
 
+        model.zero_grad(set_to_none=True)
         while True:
             if self.config.decay_lr:
                 self.current_lr = self.get_lr(self.iter_num)
@@ -115,23 +124,27 @@ class Trainer:
                     param_group['lr'] = self.current_lr
             else:
                 self.current_lr = self.config.learning_rate
+            
+            for _ in range(self.num_micro_batches):
+                x, y = self.get_batch('train')
 
-            x, y = self.get_batch('train')
+                # forward the model
+                logits, self.loss = model(x, y)
 
-            # forward the model
-            logits, self.loss = model(x, y)
+                # backprop and update the parameters
+                self.loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
+                self.optimizer.step()
 
-            # backprop and update the parameters
             model.zero_grad(set_to_none=True)
-            self.loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
-            self.optimizer.step()
 
             self.trigger_callbacks('on_batch_end')
             self.iter_num += 1
             tnow = time.time()
             self.iter_dt = tnow - self.iter_time
             self.iter_time = tnow
+
+            
 
             # termination conditions
             if config.max_iters is not None and self.iter_num >= config.max_iters:

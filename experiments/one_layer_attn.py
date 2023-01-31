@@ -23,16 +23,25 @@ def get_config():
     # system
     C.system = CN()
     C.system.seed = 3407
-    C.system.work_dir = './out/one_layer_openwebtext'
+    C.system.work_dir = './out/one_layer_openwebtext_big'
 
     # model
     C.model = OneLayerAttnTransformer.get_default_config()
     C.model.vocab_size = 50257
+    C.model.n_embd = 768
+    C.model.n_head = 12
 
     # trainer
     C.trainer = Trainer.get_default_config()
-    C.trainer.block_size = 256
+    C.trainer.block_size = 2048
     C.trainer.batch_size = 32
+    C.trainer.micro_batch_size = 4
+
+    C.trainer.learning_rate = 2e-4
+    C.trainer.decay_lr = True
+    C.trainer.warmup_iters = 1000
+    C.trainer.lr_decay_iters = 15000
+    C.trainer.min_lr = 1e-5
     return C
 
 
@@ -83,5 +92,61 @@ def train():
     trainer.run()
 
 
+def source_to_out_token(source, tokenizer, weights, d_model, n_heads):
+    """ OV circuit. Computes all heads simultaneously. """
+    d_head = d_model // n_heads
+
+    tok = tokenizer.encode(source)
+    if len(tok) > 1:
+        raise ValueError("source must be a single token")
+    
+    x = weights['embedding.weight'][tok]
+
+    w_v = weights['attn.attn.in_proj_weight'][2*d_model:] 
+    w_o = weights['attn.attn.out_proj.weight'] # shape (n_heads*d_model/n_heads, d_model)
+
+    v = torch.matmul(x, w_v)
+
+    outs = []
+    for h in range(n_heads):
+        v_h = v[:, h*d_head: (h+1)*d_head]
+        w_o_h = w_o[h*d_head: (h+1)*d_head, :]
+        o = torch.matmul(v_h, w_o_h)
+        outs.append(o.squeeze(0))
+    
+    out = torch.stack(outs, dim=0)
+
+    # unembed!
+    w_u = weights['unembedding.weight']
+    out_tokens = torch.matmul(out, w_u.T)
+
+    top_tokens = torch.topk(out_tokens, 5, dim=1).indices
+
+    # decoder needs list of int
+    tokens = [h.tolist() for h in top_tokens]
+
+    for h in tokens:
+        print(tokenizer.decode_tokens_bytes(h))
+
+
 if __name__=="__main__":
-    train()
+    # train()
+
+    enc = tiktoken.get_encoding("gpt2")
+    weights = torch.load("out/from_odin/one_layer_big_16000.pt", map_location='cpu')
+
+    for weight in weights:
+        print(weight, weights[weight].shape)
+
+    config = get_config()
+    n_heads = config.model.n_head
+    d_model = config.model.n_embd
+
+    with torch.no_grad():
+        source_to_out_token(
+            " couldn",
+            tokenizer=enc,
+            weights=weights,
+            d_model=d_model,
+            n_heads=n_heads,
+        )

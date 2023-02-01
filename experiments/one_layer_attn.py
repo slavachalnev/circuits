@@ -28,19 +28,19 @@ def get_config():
     # model
     C.model = OneLayerAttnTransformer.get_default_config()
     C.model.vocab_size = 50257
-    C.model.n_embd = 768
-    C.model.n_head = 12
+    C.model.n_embd =512 #768
+    C.model.n_head =8 #12
 
     # trainer
     C.trainer = Trainer.get_default_config()
-    C.trainer.block_size = 2048
+    C.trainer.block_size = 256#2048
     C.trainer.batch_size = 32
     C.trainer.micro_batch_size = 4
 
     C.trainer.learning_rate = 2e-4
     C.trainer.decay_lr = True
     C.trainer.warmup_iters = 1000
-    C.trainer.lr_decay_iters = 15000
+    C.trainer.lr_decay_iters = 20000
     C.trainer.min_lr = 1e-5
     return C
 
@@ -120,20 +120,23 @@ def source_to_out_token(source, tokenizer, weights, d_model, n_heads):
     w_u = weights['unembedding.weight']
     out_tokens = torch.matmul(out, w_u.T)
 
-    top_tokens = torch.topk(out_tokens, 5, dim=1).indices
+    top = torch.topk(out_tokens, 5, dim=1)
+    top_tokens = top.indices
 
     # decoder needs list of int
     tokens = [h.tolist() for h in top_tokens]
 
-    for h in tokens:
+    for i, h in enumerate(tokens):
         print(tokenizer.decode_tokens_bytes(h))
+        print(top.values[i].tolist())
+        print()
 
 
 if __name__=="__main__":
     # train()
 
     enc = tiktoken.get_encoding("gpt2")
-    weights = torch.load("out/from_odin/one_layer_big_16000.pt", map_location='cpu')
+    weights = torch.load("out/from_odin/small_8000.pt", map_location='cpu')
 
     for weight in weights:
         print(weight, weights[weight].shape)
@@ -142,9 +145,21 @@ if __name__=="__main__":
     n_heads = config.model.n_head
     d_model = config.model.n_embd
 
+    # # construct the model
+    # config.model.block_size = config.trainer.block_size
+    # model = OneLayerAttnTransformer(config.model)
+    # model.load_state_dict(weights)
+
+    # idxs = enc.encode("Hello, my name is")
+    # in_batch = torch.tensor(idxs).unsqueeze(0)
+    # generated = model.generate(in_batch, max_new_tokens=10)
+    # print(enc.decode_tokens_bytes(generated[0].tolist()))
+
+
+
     with torch.no_grad():
         source_to_out_token(
-            " couldn",
+            " github",
             tokenizer=enc,
             weights=weights,
             d_model=d_model,

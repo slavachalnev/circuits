@@ -2,6 +2,7 @@ from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class Model(nn.Module):
@@ -64,4 +65,35 @@ class Model(nn.Module):
         ]
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
+    
+    @torch.no_grad()
+    def generate(self, idx, max_new_tokens, temperature=1.0, do_sample=False, top_k=None):
+        """Generate text from the model."""
+        self.eval()
+        print('idx is ', idx)
+
+        for _ in range(max_new_tokens):
+            idx_cond = idx if idx.size(1) <= self.config.block_size else idx[:, -self.config.block_size:]
+            logits, _ = self(idx_cond)
+            logits = logits[:, -1, :] / temperature
+
+            if top_k is not None:
+                v, _ = torch.topk(logits, top_k)
+                logits[logits < v[:, [-1]]] = -float('Inf')
+
+            probs = F.softmax(logits, dim=-1)
+            print('probs is ', probs)
+            print('max probs idx is ', torch.argmax(probs, dim=-1))
+            
+
+            # either sample from the distribution or take the most likely element
+            if do_sample:
+                idx_next = torch.multinomial(probs, num_samples=1)
+            else:
+                _, idx_next = torch.topk(probs, k=1, dim=-1)
+
+            idx = torch.cat((idx, idx_next), dim=1)
+        
+        return idx
+
 

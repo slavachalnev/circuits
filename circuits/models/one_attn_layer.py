@@ -41,7 +41,11 @@ class AttentionOnlyBlock(nn.Module):
     def forward(self, x):
         x = self.ln(x)
         px = self.pos(x)
-        h, _ = self.attn(query=px, key=px, value=x)
+
+        # compute attention mask
+        mask = torch.triu(torch.ones(x.shape[1], x.shape[1]), diagonal=1).bool().to(x.device)
+
+        h, _ = self.attn(query=px, key=px, value=x, attn_mask=mask)
         return x + h
 
 
@@ -65,6 +69,7 @@ class OneLayerAttnTransformer(Model):
     
     def __init__(self, config):
         super().__init__()
+        self.config = config
 
         self.embedding = nn.Embedding(config.vocab_size, config.n_embd)
 

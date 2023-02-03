@@ -34,12 +34,20 @@ class SinusoidalEncoding(nn.Module):
 class AttentionOnlyBlock(nn.Module):
     def __init__(self, n_embed, n_head, block_size, pos_pdrop=0.0):
         super().__init__()
-        self.attn = nn.MultiheadAttention(n_embed, num_heads=n_head, batch_first=True)
+        self.attn = nn.MultiheadAttention(
+            n_embed,
+            num_heads=n_head,
+            batch_first=True,
+            bias=False,
+            )
         self.pos = SinusoidalEncoding(d_model=n_embed, dropout=pos_pdrop, max_len=block_size)
         self.ln = nn.LayerNorm(n_embed)
 
     def forward(self, x):
         x = self.ln(x)
+
+        # posigitonal encoding as per shortformer
+        # https://aclanthology.org/2021.acl-long.427.pdf
         px = self.pos(x)
 
         # compute attention mask
@@ -79,7 +87,7 @@ class OneLayerAttnTransformer(Model):
             block_size=config.block_size,
             pos_pdrop=config.pos_embd_pdrop,
             )
-        self.ln_f = nn.LayerNorm(config.n_embd)
+        # self.ln_f = nn.LayerNorm(config.n_embd)
         
         self.unembedding = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
@@ -89,22 +97,11 @@ class OneLayerAttnTransformer(Model):
         self.loss = nn.CrossEntropyLoss()
 
     def forward(self, x, targets=None):
-        # embedding
         x = self.embedding(x)
-
-        # position embedding
-
-        # pos = torch.arange(0, x.size(1), device=x.device).unsqueeze(0) # shape (1, t)
-        # pos_emb = self.pos_embedding(pos)
-        # x = x + pos_emb
-
-        # x = self.pos_embedding(x)
-
-        # attention layer
         x = self.attn(x)
 
         # final layer norm
-        x = self.ln_f(x)
+        # x = self.ln_f(x)
 
         # unembedding
         logits = self.unembedding(x)

@@ -69,7 +69,7 @@ def save_dataset(data_dir):
     # m = np.memmap('train.bin', dtype=np.uint16, mode='r')
 
 if __name__ == '__main__':
-    data_dir = '../data/openwebtext'
+    data_dir = '../../data/openwebtext'
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
         save_dataset(data_dir)

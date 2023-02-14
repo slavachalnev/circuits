@@ -2,23 +2,13 @@ import os
 import time
 from functools import partial
 
-import numpy as np
-
 import torch
-
-import tiktoken
-
-from matplotlib import pyplot as plt
-
-from tqdm import tqdm
-
 from torch.utils.tensorboard import SummaryWriter
+from yacs.config import CfgNode as CN
 
-from circuits.models.two_attn_layer import TwoLayerAttnTransformer
+from circuits.models.one_attn_layer import OneLayerAttnTransformer
 from circuits.train.trainer import Trainer
 from circuits.train.utils import set_seed, setup_logging
-
-from yacs.config import CfgNode as CN
 
 
 def get_config():
@@ -27,17 +17,17 @@ def get_config():
     # system
     C.system = CN()
     C.system.seed = 3407
-    C.system.work_dir = './out/small_2layer'
+    C.system.work_dir = './out/small_nolnf_nobias'
 
     # model
-    C.model = TwoLayerAttnTransformer.get_default_config()
+    C.model = OneLayerAttnTransformer.get_default_config()
     C.model.vocab_size = 50257
-    C.model.n_embd = 512#768
-    C.model.n_head = 8#12
+    C.model.n_embd = 768
+    C.model.n_head = 12
 
     # trainer
     C.trainer = Trainer.get_default_config()
-    C.trainer.block_size = 256#2048
+    C.trainer.block_size = 2048
     C.trainer.batch_size = 32
     # C.trainer.micro_batch_size = 4
 
@@ -79,13 +69,13 @@ def train():
     # new writer for each run based on time
     writer = SummaryWriter(os.path.join(config.system.work_dir, 'tensorboard', time.strftime("%Y-%m-%d_%H-%M-%S")))
 
-    data_dir = os.path.join("../data", "openwebtext")
+    data_dir = "../../data/openwebtext"
     if not os.path.exists(data_dir):
         raise ValueError("data not found, please run openwebtext.py")
 
     # construct the model
     config.model.block_size = config.trainer.block_size
-    model = TwoLayerAttnTransformer(config.model)
+    model = OneLayerAttnTransformer(config.model)
 
     # construct the trainer object
     trainer = Trainer(config.trainer, model, data_dir=data_dir)
@@ -95,6 +85,7 @@ def train():
     )
 
     trainer.run()
+
 
 
 if __name__ == '__main__':

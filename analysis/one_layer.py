@@ -103,12 +103,13 @@ def save_qk_averages_for_head(head_weights, head):
         qk = head_weights['w_k'].T @ q
         src = head_weights['w_e'].T @ qk
         qk_averages.append(src.mean())
-    np.save(f"qk_averages_{head}", np.array(qk_averages))
+    np.save(f"qk_avgs/head_{head}", np.array(qk_averages))
 
 if __name__=="__main__":
     enc = tiktoken.get_encoding("gpt2")
+
     # weights = torch.load("out/from_odin/big_22000.pt", map_location='cpu')
-    weights = torch.load("out/from_odin/big_nolnf_nobias_20000.pt", map_location='cpu')
+    weights = torch.load("from_odin/big_nolnf_nobias_20000.pt", map_location='cpu')
 
     for weight in weights:
         print(weight, weights[weight].shape)

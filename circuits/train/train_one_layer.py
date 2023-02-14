@@ -17,7 +17,7 @@ def get_config():
     # system
     C.system = CN()
     C.system.seed = 3407
-    C.system.work_dir = './out/small_nolnf_nobias'
+    C.system.work_dir = '../../out/big_nolnf_nobias'
 
     # model
     C.model = OneLayerAttnTransformer.get_default_config()
@@ -29,13 +29,14 @@ def get_config():
     C.trainer = Trainer.get_default_config()
     C.trainer.block_size = 2048
     C.trainer.batch_size = 32
-    # C.trainer.micro_batch_size = 4
+    C.trainer.micro_batch_size = 8
 
     C.trainer.learning_rate = 2e-4
     C.trainer.decay_lr = True
     C.trainer.warmup_iters = 1000
     C.trainer.lr_decay_iters = 20000
     C.trainer.min_lr = 1e-5
+    C.trainer.max_iters = 30000
     return C
 
 

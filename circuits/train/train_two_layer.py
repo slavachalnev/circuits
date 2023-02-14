@@ -19,7 +19,7 @@ def get_config():
     # system
     C.system = CN()
     C.system.seed = 3407
-    C.system.work_dir = './out/small_2layer'
+    C.system.work_dir = '../../out/small_2layer'
 
     # model
     C.model = TwoLayerAttnTransformer.get_default_config()

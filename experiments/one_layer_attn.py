@@ -69,6 +69,7 @@ def batch_end_callback(trainer, writer, config):
 
 
 def train():
+    torch.backends.cuda.matmul.allow_tf32 = True
     config = get_config()
     print(config)
 

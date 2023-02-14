@@ -131,11 +131,10 @@ class Trainer:
                 # forward the model
                 logits, self.loss = model(x, y)
 
-                # backprop and update the parameters
                 self.loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
-                self.optimizer.step()
 
+            torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
+            self.optimizer.step()
             model.zero_grad(set_to_none=True)
 
             self.trigger_callbacks('on_batch_end')
@@ -143,8 +142,6 @@ class Trainer:
             tnow = time.time()
             self.iter_dt = tnow - self.iter_time
             self.iter_time = tnow
-
-            
 
             # termination conditions
             if config.max_iters is not None and self.iter_num >= config.max_iters:

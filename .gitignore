@@ -137,10 +137,15 @@ tensorboard/
 
 # outputs
 out/
+*.npy
+*.png
 
 # data
 data/
 
 # vscode
 .vscode/
+
+# mac
+.DS_Store
 

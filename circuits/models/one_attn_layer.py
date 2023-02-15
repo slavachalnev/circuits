@@ -38,7 +38,7 @@ class OneLayerAttnTransformer(Model):
             block_size=config.block_size,
             pos_pdrop=config.pos_embd_pdrop,
             )
-        # self.ln_f = nn.LayerNorm(config.n_embd)
+        self.ln_f = nn.LayerNorm(config.n_embd)
         
         self.unembedding = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
@@ -52,7 +52,7 @@ class OneLayerAttnTransformer(Model):
         x = self.attn(x)
 
         # final layer norm
-        # x = self.ln_f(x)
+        x = self.ln_f(x)
 
         # unembedding
         logits = self.unembedding(x)

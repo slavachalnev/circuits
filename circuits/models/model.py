@@ -135,15 +135,15 @@ class AttentionOnlyBlock(nn.Module):
         self.ln = nn.LayerNorm(n_embed)
 
     def forward(self, x):
-        x = self.ln(x)
+        h_in = self.ln(x)
 
         # posigitonal encoding as per shortformer
         # https://aclanthology.org/2021.acl-long.427.pdf
-        px = self.pos(x)
+        px = self.pos(h_in)
 
         # compute attention mask
-        mask = torch.triu(torch.ones(x.shape[1], x.shape[1]), diagonal=1).bool().to(x.device)
+        mask = torch.triu(torch.ones(h_in.shape[1], h_in.shape[1]), diagonal=1).bool().to(h_in.device)
 
-        h, _ = self.attn(query=px, key=px, value=x, attn_mask=mask)
-        return x + h
+        h_out, _ = self.attn(query=px, key=px, value=h_in, attn_mask=mask)
+        return x + h_out
 

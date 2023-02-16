@@ -37,6 +37,8 @@ class Trainer:
         C.min_lr = 1e-5
 
         C.micro_batch_size = None
+
+        C.start_token = None
         return C
 
     def __init__(self, config, model, data_dir):
@@ -73,9 +75,22 @@ class Trainer:
     
     def get_batch(self, split):
         data = self.train_data if split == 'train' else self.val_data
-        ix = torch.randint(len(data) - self.block_size, (self.micro_batch_size,))
-        x = torch.stack([torch.from_numpy((data[i:i+self.block_size]).astype(np.int64)) for i in ix])
-        y = torch.stack([torch.from_numpy((data[i+1:i+1+self.block_size]).astype(np.int64)) for i in ix])
+
+        use_start_token = False
+        block_size = self.block_size
+        if self.config.start_token is not None:
+            use_start_token = True
+            block_size -= 1
+            start_token = np.array([self.config.start_token])
+
+        ix = torch.randint(len(data) - block_size, (self.micro_batch_size,))
+        if use_start_token:
+            x = torch.stack([torch.from_numpy(( np.concatenate((start_token, data[i:i+block_size])) ).astype(np.int64)) for i in ix])
+            y = torch.stack([torch.from_numpy((data[i:i+1+block_size]).astype(np.int64)) for i in ix])
+        else:
+            x = torch.stack([torch.from_numpy((data[i:i+block_size]).astype(np.int64)) for i in ix])
+            y = torch.stack([torch.from_numpy((data[i+1:i+1+block_size]).astype(np.int64)) for i in ix])
+
         x, y = x.to(self.device), y.to(self.device)
         return x, y
     

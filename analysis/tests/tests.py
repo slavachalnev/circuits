@@ -78,6 +78,11 @@ def split_forward_pass(weights, tokens, n_heads, d_model):
 
 
 def test_split_heads():
+    """
+    Splitting PyTorch's MultiHeadAttention into individual heads is messy so we make 
+    sure that the split-heads forward pass is the same as the normal forward pass.
+    """
+
     enc = tiktoken.get_encoding("gpt2")
     text = " hi my name is"
     x = enc.encode(text)

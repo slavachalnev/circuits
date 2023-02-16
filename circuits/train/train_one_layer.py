@@ -17,7 +17,7 @@ def get_config():
     # system
     C.system = CN()
     C.system.seed = 3407
-    C.system.work_dir = '../../out/big_nobias'
+    C.system.work_dir = '../../out/small_yeslnf'
 
     # model
     C.model = OneLayerAttnTransformer.get_default_config()

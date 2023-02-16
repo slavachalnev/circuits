@@ -9,7 +9,8 @@ from circuits.models.one_attn_layer import OneLayerAttnTransformer
 from circuits.train.train_one_layer import get_config
 
 
-def get_weights_for_head(weights, head, n_heads, d_model, norm_emb=True):
+def get_weights_for_head(weights, head, n_heads, d_model,
+                         norm_emb=True, final_ln=True):
     """ Get the weights for a single head. """
     d_head = d_model // n_heads
 
@@ -30,18 +31,35 @@ def get_weights_for_head(weights, head, n_heads, d_model, norm_emb=True):
 
     w_e = weights['embedding.weight'].numpy().T
     if norm_emb:
-        w_e = (w_e - np.average(w_e)) / np.std(w_e)
+        w_e = (w_e - np.average(w_e, axis=0, keepdims=True)) / np.std(w_e, axis=0, keepdims=True)
         w_e = w_e * ln1w + ln1b
+
+    w_u = weights['unembedding.weight'].numpy()
+    if final_ln:
+        lnfw = weights['ln_f.weight'].unsqueeze(1).numpy()
+        lnfb = weights['ln_f.bias'].unsqueeze(1).numpy()
+    # if final_ln:
+    #     raise NotImplementedError
+    #     # The idea is to roll normalization into the unembedding matrix.
+    #     # first we subtract the mean by zeroing out the diagonal dimension.
+    #     pass
+    #     # w_u = w_u @ weights['ln.weight'].numpy().T
+    #     # w_u = w_u + weights['ln.bias'].numpy()
+    
+    p_e = weights['attn.pos.pe'].numpy()
 
     return {
         'w_e': w_e,
         'w_v': w_v_h.numpy(),
         'w_o': w_o_h.numpy(),
-        'w_u': weights['unembedding.weight'].numpy(),
+        'w_u': w_u,
+        'lnfw': lnfw,
+        'lnfb': lnfb,
         'ln1w': ln1w,
         'ln1b': ln1b,
         'w_q': w_q_h.numpy(),
         'w_k': w_k_h.numpy(),
+        'p_e': p_e,
     }
 
 
@@ -81,7 +99,7 @@ def source_to_dest(source, tokenizer, head_weights, head):
     kq = head_weights['w_q'].T @ k
     dst = head_weights['w_e'].T @ kq
 
-    qk_averages = np.load(f'qk_big_nolnf_nobias/qk_averages_{head}.npy')
+    qk_averages = np.load(f'qk_big_nolnf_nobias/head_{head}.npy')
     # subtract the average qk value for each query
     dst = dst.squeeze(1) - np.array(qk_averages)
 
@@ -108,8 +126,8 @@ def save_qk_averages_for_head(head_weights, head):
 if __name__=="__main__":
     enc = tiktoken.get_encoding("gpt2")
 
-    # weights = torch.load("out/from_odin/big_22000.pt", map_location='cpu')
-    weights = torch.load("from_odin/big_nolnf_nobias_20000.pt", map_location='cpu')
+    # weights = torch.load("../from_odin/small_yeslnf_26000.pt", map_location='cpu')
+    weights = torch.load("../from_odin/big_yeslnf_22000.pt", map_location='cpu')
 
     for weight in weights:
         print(weight, weights[weight].shape)
@@ -127,7 +145,7 @@ if __name__=="__main__":
     # config.model.block_size = config.trainer.block_size
     # model = OneLayerAttnTransformer(config.model)
     # model.load_state_dict(weights)
-    # idxs = enc.encode(" hello")
+    # idxs = enc.encode(" hello there. general")
     # in_batch = torch.tensor(idxs).unsqueeze(0)
     # generated = model.generate(in_batch, max_new_tokens=10)
     # print(enc.decode_tokens_bytes(generated[0].tolist()))
@@ -153,7 +171,7 @@ if __name__=="__main__":
     plt.show()
 
     print()
-    word = "www"
+    word = " two"
     print('word:', word)
 
     for h in range(n_heads):
@@ -167,5 +185,5 @@ if __name__=="__main__":
             head_weights=h_w,
         )
         print("source to dest")
-        source_to_dest(source=word, tokenizer=enc, head_weights=h_w, head=h)
+        # source_to_dest(source=word, tokenizer=enc, head_weights=h_w, head=h)
 

@@ -45,6 +45,7 @@ class TwoLayerAttnTransformer(Model):
             block_size=config.block_size,
             pos_pdrop=config.pos_embd_pdrop,
             )
+        self.ln_f = nn.LayerNorm(config.n_embd)
         
         self.unembedding = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
@@ -58,6 +59,9 @@ class TwoLayerAttnTransformer(Model):
 
         x = self.b1(x)
         x = self.b2(x)
+
+        # final layer norm
+        x = self.ln_f(x)
 
         # unembedding
         logits = self.unembedding(x)

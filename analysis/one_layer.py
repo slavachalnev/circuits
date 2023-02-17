@@ -123,6 +123,23 @@ def save_qk_averages_for_head(head_weights, head):
         qk_averages.append(src.mean())
     np.save(f"qk_avgs/head_{head}", np.array(qk_averages))
 
+def positional_attention_for_head(head_weights, plot=False):
+    """ compute matrix of preferred relative positions. """
+    p_e = head_weights['p_e']
+    qk = head_weights['w_q'].T @ head_weights['w_k']
+
+    cut_p_e = p_e
+    res = cut_p_e @ qk.T @ cut_p_e.T
+
+    # the higher the value, the more the head attends to positions.
+    print('positional:', res.max() - res.min())
+
+    if plot:
+        # plot heatmap of res
+        plt.imshow(res)
+        plt.show()
+
+
 if __name__=="__main__":
     enc = tiktoken.get_encoding("gpt2")
 
@@ -171,13 +188,18 @@ if __name__=="__main__":
     plt.show()
 
     print()
-    word = " two"
+    word = " couldn"
     print('word:', word)
 
     for h in range(n_heads):
         h_w = get_weights_for_head(weights, h, n_heads, d_model)
+
         print()
         print("head", h)
+
+        # positional attention for head
+        positional_attention_for_head(h_w)
+
         print("source to out")
         source_to_out(
             word,
@@ -185,5 +207,5 @@ if __name__=="__main__":
             head_weights=h_w,
         )
         print("source to dest")
-        # source_to_dest(source=word, tokenizer=enc, head_weights=h_w, head=h)
+        source_to_dest(source=word, tokenizer=enc, head_weights=h_w, head=h)
 

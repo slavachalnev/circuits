@@ -42,9 +42,9 @@ It also doesn't work for the final layernorm (which I'm pretending doesn't exist
 
 Layernorm first subtracts the mean activation. This is equivalent to zeroing-out the direction corresponding to the (1, 1, ..., 1) vector (it's a diagonal line). I can think of two ways of finding a matrix M that does this:
 
-1. We can find a rotation matrix R which would rotate the x-axis to lie on the diagonal. It is a simple rotation in the plane spanned by the x-axis and the diagonal. $\quad M = R^TAR \quad $ and A is a matrix that squashes the x-axis.
+1. We can find a rotation matrix R which would rotate the x-axis to lie on the diagonal. It is a simple rotation in the plane spanned by the x-axis and the diagonal. $M = R^TAR$ and A is a matrix that squashes the x-axis.
 
-2. Alternatively, we can find an orthonormal basis for $\mathbb{R}^n$ which includes the diagonal as one of the basis vectors. We can use the Gram-Schmidt process to find an orthonormal basis. $\quad M = VAV^{-1} \quad $ where V is the matrix whose columns are the basis vectors and A is a diagonal matrix that squashes the x-axis.
+2. Alternatively, we can find an orthonormal basis for $\mathbb{R}^n$ which includes the diagonal as one of the basis vectors. We can use the Gram-Schmidt process to find an orthonormal basis. $M = VAV^{-1}$ where V is the matrix whose columns are the basis vectors and A is a diagonal matrix that squashes the x-axis.
 
 I will take the second approach.
 

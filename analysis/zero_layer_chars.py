@@ -1,3 +1,5 @@
+# TODO: the training section needs to be moved to the train folder.
+
 import os
 import time
 import pickle

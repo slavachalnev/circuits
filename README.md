@@ -1,5 +1,5 @@
 # circuits
-Replicating Anthropic's transformer circuits
+Implementation of Anthropic's transformer circuits paper
 
 https://transformer-circuits.pub/2021/framework/index.html
 
@@ -9,6 +9,7 @@ circuits
 |-- analysis                        Reproduce graphs and tables
 |   |-- assets                      Images of plots
 |   |   |-- one_layer_eigen.png     Eigenvalue plot
+|   |   |-- head_5_pos.png          Positional attention head
 |   |-- tests                       Test analysis tools
 |   |   |-- tests.py                Test weight extractor
 |   |-- one_layer.md                One layer results
@@ -37,7 +38,7 @@ circuits
 
 ---
 ### layernorm
-I currently roll the first layernorm into the embedding matrix by applying layernorm to each embedding vector individually. This won't work for two layer models.
+I currently roll the first layernorm into the embedding matrix by applying layernorm to each embedding vector individually. This won't work for two-layer models.
 It also doesn't work for the final layernorm (which I'm pretending doesn't exist even though I train with it 👀).
 
 Layernorm first subtracts the mean activation. This is equivalent to zeroing-out the direction corresponding to the (1, 1, ..., 1) vector (it's a diagonal line). I can think of two ways of finding a matrix M that does this:
@@ -46,15 +47,11 @@ Layernorm first subtracts the mean activation. This is equivalent to zeroing-out
 
 2. Alternatively, we can find an orthonormal basis for $\mathbb{R}^n$ which includes the diagonal as one of the basis vectors. We can use the Gram-Schmidt process to find an orthonormal basis. $M = VAV^{-1}$ where V is the matrix whose columns are the basis vectors and A is a diagonal matrix that squashes the x-axis.
 
-I will take the second approach.
+I will take the second approach. TODO: implement this.
 
-
+We then multiply by the learned weights. The division by variance can be factored out. I'm not what to do about the bias term.
 
 ---
 ### The <|START|> token
-I started out training one layer models without the <|START|> token. This meant that I had to compute the average qk value for each query and then subtract this from the queries. This seems to work okay, but it's a bit annoying to compute the average qk values. It looks like the <|START|> token is even more useful for two layer models so I've now started training with it.
-
----
-### How do we find positional attention heads?
-I understand that with sinusoidal positional embeddings, translation is equivalent to multiplication by a rotation matrix. But how do we determine whether $W_{QK}$ is selecting a positional offset?
+I started out training one-layer models without the <|START|> token. This meant that I had to compute the average qk value for each query and then subtract this from the queries. This seems to work okay, but it's a bit annoying to compute the average qk values. It looks like the <|START|> token is even more useful for two-layer models so I've now started training with it.
 

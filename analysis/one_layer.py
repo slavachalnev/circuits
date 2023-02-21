@@ -88,20 +88,29 @@ def source_to_out(source, tokenizer, head_weights):
     print(top.values.tolist())
 
 
-def source_to_dest(source, tokenizer, head_weights, head):
+def source_to_dest(source, tokenizer, head_weights, head, subtract_start=True):
     """ QK circuit for a single head. """
     tok = tokenizer.encode(source)
     if len(tok) > 1:
         raise ValueError("source must be a single token")
+    
+    def get_dst(t):
+        x = head_weights['w_e'][:, t]
+        k = head_weights['w_k'] @ x
+        kq = head_weights['w_q'].T @ k
+        return head_weights['w_e'].T @ kq
 
-    x = head_weights['w_e'][:, tok]
-    k = head_weights['w_k'] @ x
-    kq = head_weights['w_q'].T @ k
-    dst = head_weights['w_e'].T @ kq
+    dst = get_dst(tok)
+    dst = dst.squeeze(1)
 
-    qk_averages = np.load(f'qk_big_nolnf_nobias/head_{head}.npy')
-    # subtract the average qk value for each query
-    dst = dst.squeeze(1) - np.array(qk_averages)
+    if subtract_start:
+        qk_start = get_dst(-1)
+        dst = dst - qk_start
+        dst = dst[:-1]  # remove the start token
+    else:
+        qk_averages = np.load(f'qk_big_nolnf_nobias/head_{head}.npy')
+        # subtract the average qk value for each query
+        dst = dst - np.array(qk_averages)
 
     # reweight by token frequency
     freq = np.load('openwebtext_gpt2_averages.npy')
@@ -144,7 +153,8 @@ if __name__=="__main__":
     enc = tiktoken.get_encoding("gpt2")
 
     # weights = torch.load("../from_odin/small_yeslnf_26000.pt", map_location='cpu')
-    weights = torch.load("../from_odin/big_yeslnf_22000.pt", map_location='cpu')
+    # weights = torch.load("../from_odin/big_yeslnf_22000.pt", map_location='cpu')
+    weights = torch.load("../from_odin/big_yeslnf_start_28000.pt", map_location='cpu')
 
     for weight in weights:
         print(weight, weights[weight].shape)
@@ -188,7 +198,7 @@ if __name__=="__main__":
     plt.show()
 
     print()
-    word = " couldn"
+    word = " perfect"
     print('word:', word)
 
     for h in range(n_heads):

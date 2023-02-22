@@ -41,13 +41,13 @@ circuits
 I currently roll the first layernorm into the embedding matrix by applying layernorm to each embedding vector individually. This won't work for two-layer models.
 It also doesn't work for the final layernorm (which I'm pretending doesn't exist even though I train with it 👀).
 
-Layernorm first subtracts the mean activation. This is equivalent to zeroing-out the direction corresponding to the (1, 1, ..., 1) vector (it's a diagonal line). I can think of two ways of finding a matrix M that does this:
+Layernorm first subtracts the mean activation. This is equivalent to zeroing-out the direction corresponding to the (1, 1, ..., 1) vector (it's a diagonal line). I can think of two [Edit: 3] ways of finding a matrix M that does this
 
-1. We can find a rotation matrix R which would rotate the x-axis to lie on the diagonal. It is a simple rotation in the plane spanned by the x-axis and the diagonal. $M = R^TAR$ and A is a matrix that squashes the x-axis.
+0. [Easy] The simplest way is $M = I - \frac{A}{\text{dim(A)}}$ where A is the matrix of ones.
 
-2. Alternatively, we can find an orthonormal basis for $\mathbb{R}^n$ which includes the diagonal as one of the basis vectors. We can use the Gram-Schmidt process to find an orthonormal basis. $M = VAV^{-1}$ where V is the matrix whose columns are the basis vectors and A is a diagonal matrix that squashes the x-axis.
+1. [Hard. Ignore this.] We can find a rotation matrix R which would rotate the x-axis to lie on the diagonal. It is a simple rotation in the plane spanned by the x-axis and the diagonal. $M = R^TAR$ and A is a matrix that squashes the x-axis.
 
-I will take the second approach. TODO: implement this.
+2. [Hard. Ignore this.] Alternatively, we can find an orthonormal basis for $\mathbb{R}^n$ which includes the diagonal as one of the basis vectors. We can use the Gram-Schmidt process to find an orthonormal basis. $M = VAV^{-1}$ where V is the matrix whose columns are the basis vectors and A is a diagonal matrix that squashes the x-axis.
 
 We then multiply by the learned weights. The division by variance can be factored out. I'm not what to do about the bias term.
 
@@ -55,3 +55,6 @@ We then multiply by the learned weights. The division by variance can be factore
 ### The <|START|> token
 I started out training one-layer models without the <|START|> token. This meant that I had to compute the average qk value for each query and then subtract this from the queries. This seems to work okay, but it's a bit annoying to compute the average qk values. It looks like the <|START|> token is even more useful for two-layer models so I've now started training with it.
 
+---
+### dropout
+I've found that adding dropout seems to make the positional heads easier to interpret. I suspect this is because the model has to learn to use all of the dimensions of the positional embeddings.

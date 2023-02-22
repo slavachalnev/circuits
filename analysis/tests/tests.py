@@ -4,6 +4,7 @@ import torch
 import tiktoken
 
 from analysis.one_layer import get_weights_for_head
+from analysis.utils import get_subtract_avg_matrix
 from circuits.models.one_attn_layer import OneLayerAttnTransformer
 from circuits.train.train_one_layer import get_config
 
@@ -126,5 +127,16 @@ def test_split_heads():
     # print(enc.decode_tokens_bytes(out_idxs[0].tolist()))
 
 
+def test_subtract_avg():
+    """
+    Test that subtracting the average of a vector is the same as zeroing out the diagonal of a matrix.
+    """
+    dim = 768
+    x = np.random.randn(dim)
+    z = get_subtract_avg_matrix(dim)
+    assert np.allclose(x - np.mean(x), z @ x)
+
+
 if __name__=="__main__":
     test_split_heads()
+    test_subtract_avg()

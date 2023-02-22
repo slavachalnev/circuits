@@ -8,7 +8,7 @@ We see that most of the heads are copying.
 
 ### Primarily Positional heads
 An example of a head which attends to relative positions.
-![Positional head](assets/head_5_pos.png)
+![Positional head](assets/head_11_pos.png)
 
 
 ```

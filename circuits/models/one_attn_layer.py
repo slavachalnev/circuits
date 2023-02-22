@@ -23,6 +23,7 @@ class OneLayerAttnTransformer(Model):
 
         # dropout hyperparameters
         C.pos_embd_pdrop = 0.0
+        C.attn_pdrop = 0.0
 
         return C
     
@@ -37,6 +38,7 @@ class OneLayerAttnTransformer(Model):
             n_head=config.n_head,
             block_size=config.block_size,
             pos_pdrop=config.pos_embd_pdrop,
+            attn_pdrop=config.attn_pdrop,
             )
         self.ln_f = nn.LayerNorm(config.n_embd)
         

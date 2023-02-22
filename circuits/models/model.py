@@ -123,16 +123,18 @@ class SinusoidalEncoding(nn.Module):
 
 
 class AttentionOnlyBlock(nn.Module):
-    def __init__(self, n_embed, n_head, block_size, pos_pdrop=0.0):
+    def __init__(self, n_embed, n_head, block_size, pos_pdrop=0.0, attn_pdrop=0.0):
         super().__init__()
         self.attn = nn.MultiheadAttention(
             n_embed,
             num_heads=n_head,
             batch_first=True,
             bias=False,
+            dropout=attn_pdrop,
             )
         self.pos = SinusoidalEncoding(d_model=n_embed, dropout=pos_pdrop, max_len=block_size)
         self.ln = nn.LayerNorm(n_embed)
+        self.drop = nn.Dropout(pos_pdrop)
 
     def forward(self, x):
         h_in = self.ln(x)
@@ -140,6 +142,7 @@ class AttentionOnlyBlock(nn.Module):
         # posigitonal encoding as per shortformer
         # https://aclanthology.org/2021.acl-long.427.pdf
         px = self.pos(h_in)
+        px = self.drop(px)
 
         # compute attention mask
         mask = torch.triu(torch.ones(h_in.shape[1], h_in.shape[1]), diagonal=1).bool().to(h_in.device)

@@ -19,25 +19,30 @@ def get_config():
     # system
     C.system = CN()
     C.system.seed = 3407
-    C.system.work_dir = '../../out/small_2layer'
+    C.system.work_dir = '../../out/big_2layer_drop'
 
     # model
     C.model = TwoLayerAttnTransformer.get_default_config()
-    C.model.vocab_size = 50257
-    C.model.n_embd = 512#768
-    C.model.n_head = 8#12
+    C.model.vocab_size = 50257 + 1  # The +1 is for the extra start token
+    C.model.n_embd = 768
+    C.model.n_head = 12
+    C.model.pos_embd_pdrop = 0.1
+    C.model.attn_pdrop = 0.1
 
     # trainer
     C.trainer = Trainer.get_default_config()
-    C.trainer.block_size = 256#2048
+    C.trainer.block_size = 2048
     C.trainer.batch_size = 32
-    # C.trainer.micro_batch_size = 4
+    C.trainer.micro_batch_size = 8
 
     C.trainer.learning_rate = 2e-4
     C.trainer.decay_lr = True
     C.trainer.warmup_iters = 1000
-    C.trainer.lr_decay_iters = 20000
+    C.trainer.lr_decay_iters = 30000
     C.trainer.min_lr = 1e-5
+    C.trainer.max_iters = 30000
+
+    C.trainer.start_token = 50257
     return C
 
 
@@ -71,7 +76,7 @@ def train():
     # new writer for each run based on time
     writer = SummaryWriter(os.path.join(config.system.work_dir, 'tensorboard', time.strftime("%Y-%m-%d_%H-%M-%S")))
 
-    data_dir = os.path.join("../data", "openwebtext")
+    data_dir = "../../data/openwebtext"
     if not os.path.exists(data_dir):
         raise ValueError("data not found, please run openwebtext.py")
 

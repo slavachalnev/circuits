@@ -17,13 +17,15 @@ def get_config():
     # system
     C.system = CN()
     C.system.seed = 3407
-    C.system.work_dir = '../../out/big_yeslnf_start'
+    C.system.work_dir = '../../out/big_drop'
 
     # model
     C.model = OneLayerAttnTransformer.get_default_config()
     C.model.vocab_size = 50257 + 1  # The +1 is for the extra start token
     C.model.n_embd = 768
     C.model.n_head = 12
+    C.model.pos_embd_pdrop = 0.1
+    C.model.attn_pdrop = 0.1
 
     # trainer
     C.trainer = Trainer.get_default_config()

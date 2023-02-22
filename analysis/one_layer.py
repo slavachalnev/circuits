@@ -7,6 +7,7 @@ from tqdm import tqdm
 
 from circuits.models.one_attn_layer import OneLayerAttnTransformer
 from circuits.train.train_one_layer import get_config
+from utils import get_subtract_avg_matrix
 
 
 def get_weights_for_head(weights, head, n_heads, d_model,
@@ -38,14 +39,14 @@ def get_weights_for_head(weights, head, n_heads, d_model,
     if final_ln:
         lnfw = weights['ln_f.weight'].unsqueeze(1).numpy()
         lnfb = weights['ln_f.bias'].unsqueeze(1).numpy()
-    # if final_ln:
-    #     raise NotImplementedError
-    #     # The idea is to roll normalization into the unembedding matrix.
-    #     # first we subtract the mean by zeroing out the diagonal dimension.
-    #     pass
-    #     # w_u = w_u @ weights['ln.weight'].numpy().T
-    #     # w_u = w_u + weights['ln.bias'].numpy()
-    
+
+        # The idea is to roll normalization into the unembedding matrix.
+        # first we subtract the mean by zeroing out the diagonal dimension.
+        M = get_subtract_avg_matrix(d_model)
+        w_u = w_u @ M
+        # multiply by the layer norm weights
+        w_u = w_u * lnfw.T
+        
     p_e = weights['attn.pos.pe'].numpy()
 
     return {
@@ -137,8 +138,16 @@ def positional_attention_for_head(head_weights, plot=False):
     p_e = head_weights['p_e']
     qk = head_weights['w_q'].T @ head_weights['w_k']
 
-    cut_p_e = p_e
-    res = cut_p_e @ qk.T @ cut_p_e.T
+    res = p_e @ qk.T @ p_e.T
+
+    # # # mask out top right triangle with -inf
+    # mask = np.triu(np.ones_like(res), k=1)
+    # res = res - mask * 1e9
+
+    # # to torch, apply softmax, and convert back to numpy
+    # res = torch.from_numpy(res)
+    # res = torch.softmax(res, dim=0)
+    # res = res.numpy()
 
     # the higher the value, the more the head attends to positions.
     print('positional:', res.max() - res.min())
@@ -154,7 +163,8 @@ if __name__=="__main__":
 
     # weights = torch.load("../from_odin/small_yeslnf_26000.pt", map_location='cpu')
     # weights = torch.load("../from_odin/big_yeslnf_22000.pt", map_location='cpu')
-    weights = torch.load("../from_odin/big_yeslnf_start_28000.pt", map_location='cpu')
+    # weights = torch.load("../from_odin/big_yeslnf_start_28000.pt", map_location='cpu')
+    weights = torch.load("../from_odin/big_drop.pt", map_location='cpu')
 
     for weight in weights:
         print(weight, weights[weight].shape)

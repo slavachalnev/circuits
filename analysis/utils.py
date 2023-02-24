@@ -96,7 +96,7 @@ def positional_attention_for_head(head_weights, plot=False):
         diag_averages.append(np.trace(res, offset=-i)/ (n - i*0.99))
     print('positional max: ', np.max(diag_averages))
     print('positional argmax:', np.argmax(diag_averages))
-    # print('diagonal averages:', diag_averages[:10])
+    print('diagonal averages:', diag_averages[:5])
 
     if plot:
         # plot heatmap of res

@@ -34,12 +34,11 @@ circuits
 
 ```
 
-## What I'm thinking about
+## Thoughts
 
 ---
 ### layernorm
-I currently roll the first layernorm into the embedding matrix by applying layernorm to each embedding vector individually. This won't work for two-layer models.
-It also doesn't work for the final layernorm (which I'm pretending doesn't exist even though I train with it 👀).
+For one-layer models, I apply layernorm to each embedding vector individually. This doesn't work for two-layer models. Instead, we can roll the layernorm into the weights like this:
 
 Layernorm first subtracts the mean activation. This is equivalent to zeroing-out the direction corresponding to the (1, 1, ..., 1) vector (it's a diagonal line). To get a matrix M such that $Mx$ is equivalent to subtracting the mean from $x$, we can do $M = I - \frac{A}{\text{dim(A)}}$ where A is the matrix of ones.
 

@@ -14,11 +14,15 @@ An example of a head which attends to relative positions.
 ```
 Source token is " couldn"
 
-head 5
-max difference between values of positional attention:
-296.13678  -- this is the larges value of all the heads.
+head 11
+positional max:  0.6577057866183482
+positional argmax: 1
+# we see that the head is attending to the previous token
 
 source to out
-[b' be', b' confirm', b' agree', b' afford', b' imagine']
-[0.38773345947265625, 0.3833295404911041, 0.3782491981983185, 0.3716591000556946, 0.3678983449935913]
+[b'\x99', b'bodied', b' resist', b' contain', b' unwilling']
+[0.12821078300476074, 0.12735702097415924, 0.12677621841430664, 0.12531062960624695, 0.1235443577170372]
+source to dest
+[b't', b' really', b"'t", b' only', b' even']
+[22.910142558297608, 18.76203904619527, 18.566329625278822, 17.632106478644054, 17.53535245989735]
 ```

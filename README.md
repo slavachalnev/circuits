@@ -9,12 +9,14 @@ circuits
 |-- analysis                        Reproduce graphs and tables
 |   |-- assets                      Images of plots
 |   |   |-- one_layer_eigen.png     Eigenvalue plot
-|   |   |-- head_5_pos.png          Positional attention head
+|   |   |-- head_11_pos.png         Positional attention head
 |   |-- tests                       Test analysis tools
 |   |   |-- tests.py                Test weight extractor
 |   |-- one_layer.md                One layer results
 |   |-- one_layer.py                One layer circuits, \
 |   |                               skip-trigrams, eigenvalues
+|   |-- two_layer.py                k-composition
+|   |-- utils.py                    Tools to extract head weights
 |   |-- zero_layer_chars.py         Learn bigram char stats
 |-- circuits                        Trains attn-only models
 |   |-- models                      Define models

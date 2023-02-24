@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from circuits.models.one_attn_layer import OneLayerAttnTransformer
 from circuits.train.train_one_layer import get_config
-from utils import get_subtract_avg_matrix
+from utils import get_subtract_avg_matrix, positional_attention_for_head
 
 
 def get_weights_for_head(weights, head, n_heads, d_model,
@@ -132,36 +132,6 @@ def save_qk_averages_for_head(head_weights, head):
         src = head_weights['w_e'].T @ qk
         qk_averages.append(src.mean())
     np.save(f"qk_avgs/head_{head}", np.array(qk_averages))
-
-def positional_attention_for_head(head_weights, plot=False):
-    """ compute matrix of preferred relative positions. """
-    p_e = head_weights['p_e']
-    qk = head_weights['w_q'].T @ head_weights['w_k']
-
-    res = p_e @ qk @ p_e.T
-
-    # mask with zeros
-    mask = np.triu(np.ones_like(res), k=1)
-    res = res * (1 - mask)
-
-    # to torch, apply softmax, and convert back to numpy
-    res = torch.from_numpy(res)
-    res = torch.softmax(res, dim=0)
-    res = res.numpy()
-
-    # the higher the value, the more the head attends to positions.
-    diag_averages = []
-    n = res.shape[0]
-    for i in range(n):
-        diag_averages.append(np.trace(res, offset=-i)/ (n - i*0.99))
-    print('positional max: ', np.max(diag_averages))
-    print('positional argmax:', np.argmax(diag_averages))
-    # print('diagonal averages:', diag_averages[:10])
-
-    if plot:
-        # plot heatmap of res
-        plt.imshow(res)
-        plt.show()
 
 
 if __name__=="__main__":

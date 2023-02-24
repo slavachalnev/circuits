@@ -40,7 +40,7 @@ def get_config():
     C.trainer.warmup_iters = 1000
     C.trainer.lr_decay_iters = 30000
     C.trainer.min_lr = 1e-5
-    C.trainer.max_iters = 30000
+    C.trainer.max_iters = 35000
 
     C.trainer.start_token = 50257
     return C

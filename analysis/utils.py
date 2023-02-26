@@ -102,4 +102,14 @@ def positional_attention_for_head(head_weights, plot=False):
         # plot heatmap of res
         plt.imshow(res)
         plt.show()
+    
+    return diag_averages
+
+
+# def get_eigenvalues(weights, head, layer, n_heads, d_model):
+#     """ Get the eigenvalues for the w_v @ w_e @ w_u @ w_o matrix. """
+#     w = get_weights_for_head(weights, layer=layer, head=head,
+#                              n_heads=n_heads, d_model=d_model)
+#     m = w['w_v'] @ w['w_e'] @ w['w_u'] @ w['w_o']
+#     return np.linalg.eigvals(m)
 

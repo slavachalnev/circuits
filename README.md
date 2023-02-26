@@ -1,4 +1,6 @@
 # circuits
+![induction](analysis/assets/induction.png)
+
 Implementation of Anthropic's transformer circuits paper
 
 https://transformer-circuits.pub/2021/framework/index.html

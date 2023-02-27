@@ -1,4 +1,4 @@
-# circuits
+# Transformer Circuits
 ![induction](analysis/assets/induction.png)
 
 Implementation of Anthropic's transformer circuits paper
@@ -17,7 +17,7 @@ circuits
 |   |-- one_layer.md                One layer results
 |   |-- one_layer.py                One layer circuits, \
 |   |                               skip-trigrams, eigenvalues
-|   |-- two_layer.py                k-composition
+|   |-- two_layer.py                q, k, v composition
 |   |-- utils.py                    Tools to extract head weights
 |   |-- zero_layer_chars.py         Learn bigram char stats
 |-- circuits                        Trains attn-only models

@@ -13,7 +13,7 @@ def get_subtract_avg_matrix(dim):
     return z
 
 
-def get_weights_for_head(weights, layer, head, n_heads, d_model):
+def get_weights_for_head(weights, layer, head, n_heads, d_model, apply_layernorm=True):
     """ Get the weights for a single head. """
     d_head = d_model // n_heads
 
@@ -34,16 +34,17 @@ def get_weights_for_head(weights, layer, head, n_heads, d_model):
 
     p_e = weights[f'b{layer}.pos.pe'].numpy()
 
-    # roll layernorm into w_q, w_k, w_v
-    M = get_subtract_avg_matrix(d_model)
-    w_q_h = w_q_h @ M
-    w_q_h = w_q_h * lnw.T
+    if apply_layernorm:
+        # roll layernorm into w_q, w_k, w_v
+        M = get_subtract_avg_matrix(d_model)
+        w_q_h = w_q_h @ M
+        w_q_h = w_q_h * lnw.T
 
-    w_k_h = w_k_h @ M
-    w_k_h = w_k_h * lnw.T
+        w_k_h = w_k_h @ M
+        w_k_h = w_k_h * lnw.T
 
-    w_v_h = w_v_h @ M
-    w_v_h = w_v_h * lnw.T
+        w_v_h = w_v_h @ M
+        w_v_h = w_v_h * lnw.T
 
     return {
         # 'w_e': w_e,

@@ -51,7 +51,7 @@ def v_composition(h_0, h_1):
 if __name__=='__main__':
     enc = tiktoken.get_encoding("gpt2")
 
-    weights = torch.load("../from_odin/big_2layer_drop_34000.pt", map_location='cpu')
+    weights = torch.load("../from_odin/big_2layer_long_108000.pt", map_location='cpu')
 
     for weight in weights:
         print(weight, weights[weight].shape)
@@ -64,7 +64,8 @@ if __name__=='__main__':
     for h in range(n_heads):
         print()
         print('layer 0, head', h)
-        h_w = get_weights_for_head(weights, layer=0, head=h, n_heads=n_heads, d_model=d_model)
+        h_w = get_weights_for_head(weights, layer=0, head=h,
+            n_heads=n_heads, d_model=d_model, apply_layernorm=False)
         avg = positional_attention_for_head(h_w, plot=False)
 
         pos.append(avg[1]) # previous token

@@ -47,19 +47,7 @@ def v_composition(h_0, h_1):
 
     return f_ovov / (f_ov_0 * f_ov_1)
 
-
-if __name__=='__main__':
-    enc = tiktoken.get_encoding("gpt2")
-
-    weights = torch.load("../from_odin/big_2layer_long_108000.pt", map_location='cpu')
-
-    for weight in weights:
-        print(weight, weights[weight].shape)
-
-    config = get_config()
-    n_heads = config.model.n_head
-    d_model = config.model.n_embd
-
+def compute_qkv_composition(weights, n_heads, d_model):
     pos = []
     for h in range(n_heads):
         print()
@@ -120,3 +108,18 @@ if __name__=='__main__':
 
     # Show the plot
     plt.show()
+
+
+if __name__=='__main__':
+    enc = tiktoken.get_encoding("gpt2")
+
+    weights = torch.load("../from_odin/big_2layer_long_108000.pt", map_location='cpu')
+
+    for weight in weights:
+        print(weight, weights[weight].shape)
+
+    config = get_config()
+    n_heads = config.model.n_head
+    d_model = config.model.n_embd
+
+    compute_qkv_composition(weights, n_heads, d_model)

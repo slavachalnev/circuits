@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
 from circuits.train.train_two_layer import get_config
+from circuits.train.train_one_layer import Trainer
+from circuits.models.two_attn_layer import TwoLayerAttnTransformer
+from circuits.train.utils import set_seed
 from analysis.utils import get_weights_for_head, positional_attention_for_head
 
 
@@ -110,16 +113,101 @@ def compute_qkv_composition(weights, n_heads, d_model):
     plt.show()
 
 
+def save_attn_patterns(model, x):
+    # saving qk values is equivalent to saving attn pattern
+    x = model.embedding(x)
+
+    d0 = model.b0(x)
+    attn0 = d0['qk']
+
+    d1 = model.b1(d0['res'])
+    attn1 = d1['qk']
+
+    return attn0, attn1
+
+
+def run_with_fixed_attn(model, attns, x, targets, prev_vals=None):
+    x = model.embedding(x)
+
+    if prev_vals is None:
+        print('prev vals is None')
+        d0 = model.b0(x, qk=attns[0], add_to_res=False)
+        # x = x + torch.zeros_like(d0['res'])
+        d1 = model.b1(x, qk=attns[1], add_to_res=False)
+        # x = torch.zeros_like(d1['res'])
+    else:
+        d0 = model.b0(x, qk=attns[0], add_to_res=False)
+        x = x + prev_vals[0]
+        d1 = model.b1(x, qk=attns[1], add_to_res=False)
+        x = x + prev_vals[1]
+
+    x = model.ln_f(x)
+
+    logits = model.unembedding(x)
+    loss = model.loss(logits.view(-1, logits.size(-1)), targets.view(-1))
+    return logits, loss, [d0['h_out'], d1['h_out']]
+
+
+def marginal_loss_reduction(weights, config):
+    """
+    Algorithm for measuring marginal loss reduction of Nth order terms
+    """
+    # initialise model
+    model = TwoLayerAttnTransformer(config=config.model)
+    model.load_state_dict(weights)
+    model.eval()
+
+    # initialise trainer
+    trainer = Trainer(config=config.trainer, model=model, data_dir="../data/openwebtext")
+    x, y = trainer.get_batch(split='val')
+    logits, loss = model(x, y)
+    # print('loss is ', loss.item())
+
+    with torch.no_grad():
+        a1, a2 = save_attn_patterns(model, x)
+    print(a1.shape, a2.shape)
+
+    # uniform distribution loss
+    with torch.no_grad():
+        uniform_logits = torch.ones_like(logits)
+        print('uniform loss ', model.loss(uniform_logits.view(-1, uniform_logits.size(-1)), y.view(-1)).item())
+    
+    average_loss = {0: 0, 1: 0, 2: 0}
+    n_samples = 5
+    for sample in range(n_samples):
+        print('sample is ', sample)
+        x, y = trainer.get_batch(split='val')
+        print(x[:5])
+        vals = None
+        for order in range(3):
+            print('order is ', order)
+            with torch.no_grad():
+                logits, loss, vals = run_with_fixed_attn(model, [a1, a2], x, y, prev_vals=vals)
+            print('loss is ', loss.item())
+            average_loss[order] += loss.item()
+
+    for order in range(3):
+        print('average loss for order ', order, ' is ', average_loss[order] / n_samples)
+
+
+
+
+
 if __name__=='__main__':
     enc = tiktoken.get_encoding("gpt2")
 
     weights = torch.load("../from_odin/big_2layer_long_108000.pt", map_location='cpu')
 
-    for weight in weights:
-        print(weight, weights[weight].shape)
+    # for weight in weights:
+    #     print(weight, weights[weight].shape)
 
     config = get_config()
     n_heads = config.model.n_head
     d_model = config.model.n_embd
+    config.model.block_size = config.trainer.block_size
+    # set_seed(config.system.seed)
 
-    compute_qkv_composition(weights, n_heads, d_model)
+    # compute_qkv_composition(weights, n_heads, d_model)
+
+    # term importance analysis
+    marginal_loss_reduction(weights, config)

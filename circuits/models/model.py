@@ -136,7 +136,7 @@ class AttentionOnlyBlock(nn.Module):
         self.ln = nn.LayerNorm(n_embed)
         self.drop = nn.Dropout(pos_pdrop)
 
-    def forward(self, x):
+    def forward(self, x, qk=None, add_to_res=True):
         h_in = self.ln(x)
 
         # posigitonal encoding as per shortformer
@@ -144,9 +144,18 @@ class AttentionOnlyBlock(nn.Module):
         px = self.pos(h_in)
         px = self.drop(px)
 
+        if qk is not None:
+            px = qk
+
         # compute attention mask
         mask = torch.triu(torch.ones(h_in.shape[1], h_in.shape[1]), diagonal=1).bool().to(h_in.device)
 
         h_out, _ = self.attn(query=px, key=px, value=h_in, attn_mask=mask)
-        return x + h_out
+        
+        if add_to_res:
+            res = x + h_out
+        else:
+            res = x
+        
+        return {'res': res, 'qk': px, 'h_out': h_out}
 

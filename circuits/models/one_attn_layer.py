@@ -51,7 +51,7 @@ class OneLayerAttnTransformer(Model):
 
     def forward(self, x, targets=None):
         x = self.embedding(x)
-        x = self.attn(x)
+        x = self.attn(x)['res']
 
         # final layer norm
         x = self.ln_f(x)

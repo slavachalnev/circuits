@@ -4,40 +4,9 @@ import torch
 import tiktoken
 
 from analysis.one_layer import get_weights_for_head
-from analysis.utils import get_subtract_avg_matrix
+from analysis.utils import get_subtract_avg_matrix, head_forward_pass
 from circuits.models.one_attn_layer import OneLayerAttnTransformer
 from circuits.train.train_one_layer import get_config
-
-
-def head_forward_pass(x, weights):
-    # x shape is (seq_len, d_model)
-    # weights is a dict of weights for the head
-
-    x_pos = x + weights['p_e'][:x.shape[0], :]
-
-    q = weights['w_q'] @ x_pos.T  # q shape is (d_head, seq_len)
-    k = weights['w_k'] @ x_pos.T  # k shape is (d_head, seq_len)
-
-    v = weights['w_v'] @ x.T  # v shape is (d_head, seq_len)
-
-    # compute attention
-    a = q.T @ k  # a shape is (seq_len, seq_len)
-    a = a / np.sqrt(q.shape[0])
-
-    infs = np.full(a.shape, -np.inf)
-    mask = np.triu(infs, k=1)
-    a = a + mask
-
-    # to torch, softmax, back to numpy haha
-    a = torch.from_numpy(a)
-    a = torch.softmax(a, dim=1)
-    a = a.numpy()
-
-    # compute output
-    o = a @ v.T  # o shape is (seq_len, d_head)
-    out = o @ weights['w_o'].T  # out shape is (seq_len, d_model)
-
-    return out
 
 
 def split_forward_pass(weights, tokens, n_heads, d_model):
@@ -62,7 +31,7 @@ def split_forward_pass(weights, tokens, n_heads, d_model):
     head_outs = []
     for head in range(n_heads):
         # perform forward pass for head
-        head_outs.append(head_forward_pass(x_ln, heads[head]))
+        head_outs.append(head_forward_pass(x_ln, heads[head])[0])
         pass
 
     # combine heads

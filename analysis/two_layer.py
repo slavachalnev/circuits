@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
 from circuits.train.train_two_layer import get_config
-from analysis.utils import get_weights_for_head, positional_attention_for_head
+from analysis.utils import get_weights_for_head, positional_attention_for_head, head_forward_pass
 
 
 def k_composition(h_0, h_1):
@@ -110,6 +110,95 @@ def compute_qkv_composition(weights, n_heads, d_model):
     plt.show()
 
 
+def get_attention(weights, tokens, h_heads, d_model):
+    """ Forward pass, return attention and value norms. """
+
+    tokens = [50257] + tokens  # add start token
+
+    layer_0 = []
+    for h in range(h_heads):
+        layer_0.append(get_weights_for_head(weights,
+                                            layer=0,
+                                            head=h,
+                                            n_heads=h_heads,
+                                            d_model=d_model,
+                                            apply_layernorm=False,
+                                            ))
+    layer_1 = []
+    for h in range(h_heads):
+        layer_1.append(get_weights_for_head(weights,
+                                            layer=1,
+                                            head=h,
+                                            n_heads=h_heads,
+                                            d_model=d_model,
+                                            apply_layernorm=False,
+                                            ))
+    
+    x = weights['embedding.weight'].numpy()[tokens, :]
+
+    x_ln = (x - np.mean(x, axis=-1, keepdims=True)) / (np.std(x, axis=-1, keepdims=True) + 1e-5)
+    x_ln = x_ln * weights['b0.ln.weight'].numpy() + weights['b0.ln.bias'].numpy()
+
+    layer_0_res = []
+    for h in range(h_heads):
+        layer_0_res.append(head_forward_pass(x_ln, layer_0[h]))
+    
+    for h in range(h_heads):
+        x += layer_0_res[h][0]
+    
+    x_ln = (x - np.mean(x, axis=-1, keepdims=True)) / (np.std(x, axis=-1, keepdims=True) + 1e-5)
+    x_ln = x_ln * weights['b1.ln.weight'].numpy() + weights['b1.ln.bias'].numpy()
+
+    layer_1_res = []
+    for h in range(h_heads):
+        layer_1_res.append(head_forward_pass(x_ln, layer_1[h]))
+    
+    for h in range(h_heads):
+        x += layer_1_res[h][0]
+    
+    attention = [out[1] for out in layer_0_res] + [out[1] for out in layer_1_res]
+    attention = np.array(attention)
+    attention = np.transpose(attention, (1, 2, 0))
+
+    value_norms = [out[2] for out in layer_0_res] + [out[2] for out in layer_1_res]
+    value_norms = [np.linalg.norm(v, axis=-1) for v in value_norms]
+    value_norms = np.array(value_norms)
+    value_norms = value_norms.T
+
+    weighted_attn = np.zeros_like(attention)
+    for i in range(attention.shape[0]):
+        weighted_attn[i] = attention[i] * value_norms
+        weighted_attn[i] /= np.max(weighted_attn[i])
+
+    return weighted_attn
+
+
+def plot_attention_on_text(encoder, weights, n_heads, d_model):
+    """ Plot attention on text. """
+
+    # requires https://github.com/anthropics/PySvelte
+    import pysvelte
+
+    toks = encoder.encode(
+        "Mr and Mrs Dursley, of number four, Privet Drive, were proud to say " + \
+        "that they were perfectly normal, thank you very much. They were the " + \
+        "last people you'd expect to be involved in anything strange or " + \
+        "mysterious, because they just didn't hold with such nonsense. Mr Dursley " + \
+        "was the director of a firm called Grunnings, which made drills. He was a " + \
+        "big, beefy man with hardly any neck, although he did have a very large " + \
+        "moustache. Mrs Dursley was thin and blonde"
+    )
+    words = ["<START>"] + [encoder.decode([t]) for t in toks]
+    attn = get_attention(weights, toks, n_heads, d_model)
+
+    pysvelte.AttentionMulti(tokens=words, attention=attn,
+                            head_labels=['0:0', '0:1', '0:2', '0:3', '0:4', '0:5',
+                                         '0:6', '0:7', '0:8', '0:9', '0:10', '0:11',
+                                         '1:0', '1:1', '1:2', '1:3', '1:4', '1:5',
+                                         '1:6', '1:7', '1:8', '1:9', '1:10', '1:11'],
+                            ).publish("./potter.html")
+
+
 if __name__=='__main__':
     enc = tiktoken.get_encoding("gpt2")
 
@@ -123,3 +212,4 @@ if __name__=='__main__':
     d_model = config.model.n_embd
 
     compute_qkv_composition(weights, n_heads, d_model)
+    # plot_attention_on_text(encoder=enc, weights=weights, n_heads=n_heads, d_model=d_model)

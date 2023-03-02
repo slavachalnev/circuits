@@ -114,3 +114,33 @@ def positional_attention_for_head(head_weights, plot=False):
 #     m = w['w_v'] @ w['w_e'] @ w['w_u'] @ w['w_o']
 #     return np.linalg.eigvals(m)
 
+
+def head_forward_pass(x, weights):
+    # x shape is (seq_len, d_model)
+    # weights is a dict of weights for the head
+
+    x_pos = x + weights['p_e'][:x.shape[0], :]
+
+    q = weights['w_q'] @ x_pos.T  # q shape is (d_head, seq_len)
+    k = weights['w_k'] @ x_pos.T  # k shape is (d_head, seq_len)
+
+    v = weights['w_v'] @ x.T  # v shape is (d_head, seq_len)
+
+    # compute attention
+    a = q.T @ k  # a shape is (seq_len, seq_len)
+    a = a / np.sqrt(q.shape[0])
+
+    infs = np.full(a.shape, -np.inf)
+    mask = np.triu(infs, k=1)
+    a = a + mask
+
+    # to torch, softmax, back to numpy haha
+    a = torch.from_numpy(a)
+    a = torch.softmax(a, dim=1)
+    a = a.numpy()
+
+    # compute output
+    o = a @ v.T  # o shape is (seq_len, d_head)
+    out = o @ weights['w_o'].T  # out shape is (seq_len, d_model)
+
+    return out, a, v.T

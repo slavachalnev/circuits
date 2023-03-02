@@ -20,7 +20,9 @@ circuits
 |   |-- one_layer.md                One layer results
 |   |-- one_layer.py                One layer circuits, \
 |   |                               skip-trigrams, eigenvalues
-|   |-- two_layer.py                q, k, v composition
+|   |-- potter.py                   Harry Potter analysis
+|   |-- two_layer.py                q, k, v composition,
+|   |                               attention visualisation
 |   |-- utils.py                    Tools to extract head weights
 |   |-- zero_layer_chars.py         Learn bigram char stats
 |-- circuits                        Trains attn-only models

@@ -5,6 +5,9 @@ Implementation of Anthropic's transformer circuits paper
 
 https://transformer-circuits.pub/2021/framework/index.html
 
+### Attention Visualisation:
+https://slavachalnev.github.io/circuits/analysis/potter.html
+
 ## Project Layout
 ```
 circuits

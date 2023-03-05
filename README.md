@@ -24,7 +24,6 @@ circuits
 |   |-- two_layer.py                q, k, v composition,
 |   |                               attention visualisation
 |   |-- utils.py                    Tools to extract head weights
-|   |-- zero_layer_chars.py         Learn bigram char stats
 |-- circuits                        Trains attn-only models
 |   |-- models                      Define models
 |   |   |-- model.py                Base attn-only model
@@ -56,7 +55,3 @@ We then multiply by the learned weights. The division by variance can be factore
 ---
 ### The <|START|> token
 I started out training one-layer models without the <|START|> token. This meant that I had to compute the average qk value for each query and then subtract this from the queries. This seems to work okay, but it's a bit annoying to compute the average qk values. It looks like the <|START|> token is even more useful for two-layer models so I've now started training with it.
-
----
-### dropout
-I've found that adding dropout seems to make the positional heads easier to interpret. I suspect this is because the model has to learn to use all of the dimensions of the positional embeddings.

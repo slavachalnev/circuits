@@ -20,7 +20,7 @@ circuits
 |   |-- one_layer.md                One layer results
 |   |-- one_layer.py                One layer circuits, \
 |   |                               skip-trigrams, eigenvalues
-|   |-- potter.py                   Harry Potter analysis
+|   |-- potter.html                 Harry Potter analysis
 |   |-- two_layer.py                q, k, v composition,
 |   |                               attention visualisation
 |   |-- utils.py                    Tools to extract head weights
@@ -29,7 +29,6 @@ circuits
 |   |   |-- model.py                Base attn-only model
 |   |   |-- one_attn_layer.py       One layer transformer
 |   |   |-- two_attn_layer.py       Two layer transformer
-|   |   |-- zero_layer.py           Bigram model
 |   |-- train                       Train and data prep
 |   |   |-- openwebtext.py          Prep webtext dataset
 |   |   |-- train_one_layer.py      One layer training script

@@ -83,7 +83,7 @@ def save_qk_averages_for_head(head_weights, head):
 if __name__=="__main__":
     enc = tiktoken.get_encoding("gpt2")
 
-    weights = torch.load("../from_odin/big_drop_2_4000.pt", map_location='cpu')
+    weights = torch.load("../from_odin/big_drop_2_10000.pt", map_location='cpu')
 
     for weight in weights:
         print(weight, weights[weight].shape)

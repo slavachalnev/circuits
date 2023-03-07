@@ -3,35 +3,38 @@ import numpy as np
 import torch
 import tiktoken
 
-from analysis.one_layer import get_weights_for_head
-from analysis.utils import get_subtract_avg_matrix, head_forward_pass
+from analysis.utils import get_subtract_avg_matrix, head_forward_pass, get_weights_for_head, get_embedding_weights
 from circuits.models.one_attn_layer import OneLayerAttnTransformer
 from circuits.train.train_one_layer import get_config
 
 
 def split_forward_pass(weights, tokens, n_heads, d_model):
-    heads = []
+    # extract the weights for each head
+    head_weights = []
     for head in range(n_heads):
-        heads.append(get_weights_for_head(weights, head, n_heads, d_model,
-                                          norm_emb=True, final_ln=True))
-    h0 = heads[0]
+        h_w = get_weights_for_head(weights=weights, layer=0, head=head,
+                            n_heads=n_heads, d_model=d_model, apply_layernorm=False)
+        head_weights.append(h_w)
+
+    embedding_weights = get_embedding_weights(weights=weights, d_model=d_model,
+                                              norm_emb=False, final_layernorm=False)
 
     # embedding
     x = weights['embedding.weight'].numpy()[tokens, :]
     # x shape is (seq_len, d_model)
 
-    x_ln = h0['w_e'].T[tokens, :]
+    x_ln = embedding_weights['w_e'].T[tokens, :]
     print('x_ln is ', x_ln)
 
-    # # compute layernormed x
-    # x_ln = (x - np.mean(x, axis=-1, keepdims=True)) / np.sqrt(np.var(x, axis=-1, keepdims=True) + 1e-5)
-    # x_ln = x_ln * h0['ln1w'].T + h0['ln1b'].T
+    # compute layernormed x
+    x_ln = (x - np.mean(x, axis=-1, keepdims=True)) / np.sqrt(np.var(x, axis=-1, keepdims=True) + 1e-5)
+    x_ln = x_ln * head_weights[0]['lnw'].T + head_weights[0]['lnb'].T
 
     # perform forward pass
     head_outs = []
     for head in range(n_heads):
         # perform forward pass for head
-        head_outs.append(head_forward_pass(x_ln, heads[head])[0])
+        head_outs.append(head_forward_pass(x_ln, head_weights[head])[0])
         pass
 
     # combine heads
@@ -40,10 +43,10 @@ def split_forward_pass(weights, tokens, n_heads, d_model):
     
     # final layer norm
     x = (x - np.mean(x, axis=-1, keepdims=True)) / np.sqrt(np.var(x, axis=-1, keepdims=True) + 1e-5)
-    x = x * h0['lnfw'].T + h0['lnfb'].T
+    x = x * embedding_weights['lnfw'].T + embedding_weights['lnfb'].T
     
     # unembedding
-    x = x @ heads[0]['w_u'].T
+    x = x @ embedding_weights['w_u'].T
     return x
 
 
@@ -61,7 +64,7 @@ def test_split_heads():
     print(type(x))
 
     # load weights
-    weights = torch.load("../../from_odin/big_yeslnf_22000.pt", map_location='cpu')
+    weights = torch.load("../../from_odin/big_drop_2_10000.pt", map_location='cpu')
     for weight in weights:
         print(weight, weights[weight].shape)
     

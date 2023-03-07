@@ -44,16 +44,3 @@ circuits
 ## Notable Differences
 - Tokenizer: I use the GPT-2 tokenizer. I don't know what tokenizer the paper used but it's definitely different.
 - Dataset: I use the OpenWebText dataset whereas the paper uses a mix of "Common Crawl data and internet books, along with a number of smaller distributions, including about 10% python code data"
-
-## Thoughts
----
-### layernorm
-For one-layer models, I apply layernorm to each embedding vector individually. This doesn't work for two-layer models. Instead, we can roll the layernorm into the weights like this:
-
-Layernorm first subtracts the mean activation. This is equivalent to zeroing-out the direction corresponding to the (1, 1, ..., 1) vector (it's a diagonal line). To get a matrix M such that $Mx$ is equivalent to subtracting the mean from $x$, we can do $M = I - \frac{A}{\text{dim(A)}}$ where A is the matrix of ones.
-
-We then multiply by the learned weights. The division by variance can be factored out. I'm not sure what to do about the bias term.
-
----
-### The <|START|> token
-I started out training one-layer models without the <|START|> token. This meant that I had to compute the average qk value for each query and then subtract this from the queries. This seems to work okay, but it's a bit annoying to compute the average qk values. It looks like the <|START|> token is even more useful for two-layer models so I've now started training with it.

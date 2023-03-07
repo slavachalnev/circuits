@@ -17,7 +17,7 @@ def get_config():
     # system
     C.system = CN()
     C.system.seed = 3407
-    C.system.work_dir = '../../out/big_drop'
+    C.system.work_dir = '../../out/big_drop_2'
 
     # model
     C.model = OneLayerAttnTransformer.get_default_config()
@@ -36,9 +36,9 @@ def get_config():
     C.trainer.learning_rate = 2e-4
     C.trainer.decay_lr = True
     C.trainer.warmup_iters = 1000
-    C.trainer.lr_decay_iters = 20000
+    C.trainer.lr_decay_iters = 40000
     C.trainer.min_lr = 1e-5
-    C.trainer.max_iters = 30000
+    C.trainer.max_iters = 50000
 
     C.trainer.start_token = 50257
     return C

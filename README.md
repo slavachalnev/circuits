@@ -1,7 +1,7 @@
 # Transformer Circuits
 ![induction](analysis/assets/induction.png)
 
-Implementation of Anthropic's transformer circuits paper
+Implementation of Anthropic's A Mathematical Framework for Transformer Circuits paper
 
 https://transformer-circuits.pub/2021/framework/index.html
 
@@ -41,8 +41,11 @@ circuits
 
 ```
 
-## Thoughts
+## Notable Differences
+- Tokenizer: I use the GPT-2 tokenizer. I don't know what tokenizer the paper used but it's definitely different.
+- Dataset: I use the OpenWebText dataset whereas the paper uses a mix of "Common Crawl data and internet books, along with a number of smaller distributions, including about 10% python code data"
 
+## Thoughts
 ---
 ### layernorm
 For one-layer models, I apply layernorm to each embedding vector individually. This doesn't work for two-layer models. Instead, we can roll the layernorm into the weights like this:

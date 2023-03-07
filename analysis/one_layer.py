@@ -141,8 +141,6 @@ if __name__=="__main__":
     print('word:', word)
 
     for h in range(n_heads):
-        # h_w = get_weights_for_head(weights, h, n_heads, d_model)
-
         print()
         print("head", h)
 

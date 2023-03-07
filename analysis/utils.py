@@ -47,12 +47,8 @@ def get_weights_for_head(weights, layer, head, n_heads, d_model, apply_layernorm
         w_v_h = w_v_h * lnw.T
 
     return {
-        # 'w_e': w_e,
         'w_v': w_v_h.numpy(),
         'w_o': w_o_h.numpy(),
-        # 'w_u': w_u,
-        # 'lnfw': lnfw,
-        # 'lnfb': lnfb,
         'lnw': lnw,
         'lnb': lnb,
         'w_q': w_q_h.numpy(),
@@ -60,18 +56,34 @@ def get_weights_for_head(weights, layer, head, n_heads, d_model, apply_layernorm
         'p_e': p_e,
     }
 
-# def get_embedding_weights(weights):
-#     """ Get the embedding weights. """
+def get_embedding_weights(weights, d_model, norm_emb=False, final_layernorm=True):
+    """ Get the embedding weights. """
 
-#     w_e = weights['embedding.weight'].numpy().T
-#     if norm_emb:
-#         w_e = (w_e - np.average(w_e, axis=0, keepdims=True)) / np.std(w_e, axis=0, keepdims=True)
-#         w_e = w_e * ln1w + ln1b
+    w_e = weights['embedding.weight'].numpy().T
+    if norm_emb:
+        lnw = weights['b0.ln.weight'].unsqueeze(1).numpy()
+        lnb = weights['b0.ln.bias'].unsqueeze(1).numpy()
+        w_e = (w_e - np.average(w_e, axis=0, keepdims=True)) / np.std(w_e, axis=0, keepdims=True)
+        w_e = w_e * lnw + lnb
+    
+    lnfw = weights['ln_f.weight'].unsqueeze(1).numpy()
+    lnfb = weights['ln_f.bias'].unsqueeze(1).numpy()
 
-#     return {
-#         'w_e': w_e,
-#         'w_u': w_u,
-#     }
+    w_u = weights['unembedding.weight'].numpy()
+    if final_layernorm:
+        # Roll final layernorm into the unembedding matrix.
+        # first we subtract the mean by zeroing out the diagonal dimension.
+        M = get_subtract_avg_matrix(d_model)
+        w_u = w_u @ M
+        # multiply by the layer norm weights
+        w_u = w_u * lnfw.T
+
+    return {
+        'w_e': w_e,
+        'w_u': w_u,
+        'lnfw': lnfw,
+        'lnfb': lnfb,
+    }
 
 
 def positional_attention_for_head(head_weights, plot=False):
@@ -105,14 +117,6 @@ def positional_attention_for_head(head_weights, plot=False):
         plt.show()
     
     return diag_averages
-
-
-# def get_eigenvalues(weights, head, layer, n_heads, d_model):
-#     """ Get the eigenvalues for the w_v @ w_e @ w_u @ w_o matrix. """
-#     w = get_weights_for_head(weights, layer=layer, head=head,
-#                              n_heads=n_heads, d_model=d_model)
-#     m = w['w_v'] @ w['w_e'] @ w['w_u'] @ w['w_o']
-#     return np.linalg.eigvals(m)
 
 
 def head_forward_pass(x, weights):

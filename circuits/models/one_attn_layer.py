@@ -33,7 +33,7 @@ class OneLayerAttnTransformer(Model):
 
         self.embedding = nn.Embedding(config.vocab_size, config.n_embd)
 
-        self.b1 = AttentionOnlyBlock(
+        self.b0 = AttentionOnlyBlock(
             n_embed=config.n_embd,
             n_head=config.n_head,
             block_size=config.block_size,
@@ -51,7 +51,7 @@ class OneLayerAttnTransformer(Model):
 
     def forward(self, x, targets=None):
         x = self.embedding(x)
-        x = self.b1(x)
+        x = self.b0(x)
 
         # final layer norm
         x = self.ln_f(x)

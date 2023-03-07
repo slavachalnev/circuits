@@ -7,81 +7,26 @@ from tqdm import tqdm
 
 from circuits.models.one_attn_layer import OneLayerAttnTransformer
 from circuits.train.train_one_layer import get_config
-from utils import get_subtract_avg_matrix, positional_attention_for_head
+from utils import positional_attention_for_head, get_weights_for_head, get_embedding_weights
 
 
-def get_weights_for_head(weights, head, n_heads, d_model,
-                         norm_emb=True, final_ln=True):
-    """ Get the weights for a single head. """
-    d_head = d_model // n_heads
-
-    w_v = weights['attn.attn.in_proj_weight'][2*d_model:]
-    w_o = weights['attn.attn.out_proj.weight'] 
-
-    w_v_h = w_v[head*d_head: (head+1)*d_head, :]
-    w_o_h = w_o[:, head*d_head: (head+1)*d_head]
-
-    w_q = weights['attn.attn.in_proj_weight'][:d_model]
-    w_k = weights['attn.attn.in_proj_weight'][d_model:2*d_model]
-
-    w_q_h = w_q[head*d_head: (head+1)*d_head, :]
-    w_k_h = w_k[head*d_head: (head+1)*d_head, :]
-
-    ln1w = weights['attn.ln.weight'].unsqueeze(1).numpy()
-    ln1b = weights['attn.ln.bias'].unsqueeze(1).numpy()
-
-    w_e = weights['embedding.weight'].numpy().T
-    if norm_emb:
-        w_e = (w_e - np.average(w_e, axis=0, keepdims=True)) / np.std(w_e, axis=0, keepdims=True)
-        w_e = w_e * ln1w + ln1b
-
-    w_u = weights['unembedding.weight'].numpy()
-    if final_ln:
-        lnfw = weights['ln_f.weight'].unsqueeze(1).numpy()
-        lnfb = weights['ln_f.bias'].unsqueeze(1).numpy()
-
-        # The idea is to roll normalization into the unembedding matrix.
-        # first we subtract the mean by zeroing out the diagonal dimension.
-        M = get_subtract_avg_matrix(d_model)
-        w_u = w_u @ M
-        # multiply by the layer norm weights
-        w_u = w_u * lnfw.T
-        
-    p_e = weights['attn.pos.pe'].numpy()
-
-    return {
-        'w_e': w_e,
-        'w_v': w_v_h.numpy(),
-        'w_o': w_o_h.numpy(),
-        'w_u': w_u,
-        'lnfw': lnfw,
-        'lnfb': lnfb,
-        'ln1w': ln1w,
-        'ln1b': ln1b,
-        'w_q': w_q_h.numpy(),
-        'w_k': w_k_h.numpy(),
-        'p_e': p_e,
-    }
-
-
-def get_eigenvalues(weights, head, n_heads, d_model):
+def get_eigenvalues(wh, we):
     """ Get the eigenvalues for the w_v @ w_e @ w_u @ w_o matrix. """
-    w = get_weights_for_head(weights, head, n_heads, d_model)
-    m = w['w_v'] @ w['w_e'] @ w['w_u'] @ w['w_o']
+    m = wh['w_v'] @ we['w_e'] @ we['w_u'] @ wh['w_o']
     return np.linalg.eigvals(m)
 
 
-def source_to_out(source, tokenizer, head_weights):
+def source_to_out(source, tokenizer, head_weights, embedding_weights):
     """ OV circuit for a single head. """
     tok = tokenizer.encode(source)
     if len(tok) > 1:
         raise ValueError("source must be a single token")
     
-    x = head_weights['w_e'][:, tok]
+    x = embedding_weights['w_e'][:, tok]
 
     v = head_weights['w_v'] @ x
     o = head_weights['w_o'] @ v
-    y = head_weights['w_u'] @ o
+    y = embedding_weights['w_u'] @ o
 
     torch_y = torch.from_numpy(y).squeeze(1)
     top = torch.topk(torch_y, 5)
@@ -89,17 +34,18 @@ def source_to_out(source, tokenizer, head_weights):
     print(top.values.tolist())
 
 
-def source_to_dest(source, tokenizer, head_weights, head, subtract_start=True):
+def source_to_dest(source, tokenizer, head_weights, embedding_weights, head,
+                   subtract_start=True):
     """ QK circuit for a single head. """
     tok = tokenizer.encode(source)
     if len(tok) > 1:
         raise ValueError("source must be a single token")
     
     def get_dst(t):
-        x = head_weights['w_e'][:, t]
+        x = embedding_weights['w_e'][:, t]
         k = head_weights['w_k'] @ x
         kq = head_weights['w_q'].T @ k
-        return head_weights['w_e'].T @ kq
+        return embedding_weights['w_e'].T @ kq
 
     dst = get_dst(tok)
     dst = dst.squeeze(1)
@@ -137,10 +83,7 @@ def save_qk_averages_for_head(head_weights, head):
 if __name__=="__main__":
     enc = tiktoken.get_encoding("gpt2")
 
-    # weights = torch.load("../from_odin/small_yeslnf_26000.pt", map_location='cpu')
-    # weights = torch.load("../from_odin/big_yeslnf_22000.pt", map_location='cpu')
-    # weights = torch.load("../from_odin/big_yeslnf_start_28000.pt", map_location='cpu')
-    weights = torch.load("../from_odin/big_drop.pt", map_location='cpu')
+    weights = torch.load("../from_odin/big_drop_2_4000.pt", map_location='cpu')
 
     for weight in weights:
         print(weight, weights[weight].shape)
@@ -163,10 +106,20 @@ if __name__=="__main__":
     # generated = model.generate(in_batch, max_new_tokens=10)
     # print(enc.decode_tokens_bytes(generated[0].tolist()))
 
+    # extract the weights for each head
+    head_weights = []
+    for head in range(n_heads):
+        h_w = get_weights_for_head(weights=weights, layer=0, head=head,
+                            n_heads=n_heads, d_model=d_model, apply_layernorm=False)
+        head_weights.append(h_w)
 
+    embedding_weights = get_embedding_weights(weights=weights, d_model=d_model,
+                                              norm_emb=True, final_layernorm=True)
+
+    # eigenvalues for each head
     graphs = []
     for head in range(n_heads):
-        eigen = get_eigenvalues(weights=weights, head=head, n_heads=n_heads, d_model=d_model)
+        eigen = get_eigenvalues(wh=head_weights[head], we=embedding_weights)
         xs = eigen.real
         ys = eigen.imag
         graphs.append((xs, ys))
@@ -188,20 +141,22 @@ if __name__=="__main__":
     print('word:', word)
 
     for h in range(n_heads):
-        h_w = get_weights_for_head(weights, h, n_heads, d_model)
+        # h_w = get_weights_for_head(weights, h, n_heads, d_model)
 
         print()
         print("head", h)
 
         # positional attention for head
-        positional_attention_for_head(h_w)
+        positional_attention_for_head(head_weights[h])
 
         print("source to out")
         source_to_out(
             word,
             tokenizer=enc,
-            head_weights=h_w,
+            head_weights=head_weights[h],
+            embedding_weights=embedding_weights,
         )
         print("source to dest")
-        source_to_dest(source=word, tokenizer=enc, head_weights=h_w, head=h)
+        source_to_dest(source=word, tokenizer=enc, head_weights=head_weights[h],
+                       embedding_weights=embedding_weights, head=h)
 

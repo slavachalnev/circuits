@@ -1,0 +1,7 @@
+matplotlib
+numpy
+tensorboard
+tiktoken
+torch
+tqdm
+yacs

@@ -16,9 +16,8 @@ def get_eigenvalues(wh, we):
     return np.linalg.eigvals(m)
 
 
-def source_to_out(source, tokenizer, head_weights, embedding_weights):
+def source_to_out(tok, tokenizer, head_weights, embedding_weights):
     """ OV circuit for a single head. """
-    tok = tokenizer.encode(source)
     if len(tok) > 1:
         raise ValueError("source must be a single token")
     
@@ -30,14 +29,16 @@ def source_to_out(source, tokenizer, head_weights, embedding_weights):
 
     torch_y = torch.from_numpy(y).squeeze(1)
     top = torch.topk(torch_y, 5)
-    print(tokenizer.decode_tokens_bytes(top.indices.tolist()))
-    print(top.values.tolist())
+
+    decoded = tokenizer.decode_tokens_bytes(top.indices.tolist())
+    values = top.values.tolist()
+    return decoded, values
 
 
-def source_to_dest(source, tokenizer, head_weights, embedding_weights, head,
+def source_to_dest(tok, tokenizer, head_weights, embedding_weights, head,
                    subtract_start=True):
     """ QK circuit for a single head. """
-    tok = tokenizer.encode(source)
+    # tok = tokenizer.encode(source)
     if len(tok) > 1:
         raise ValueError("source must be a single token")
     
@@ -65,8 +66,10 @@ def source_to_dest(source, tokenizer, head_weights, embedding_weights, head,
 
     tdst = torch.from_numpy(dst)
     top = torch.topk(tdst, 5)
-    print(tokenizer.decode_tokens_bytes(top.indices.tolist()))
-    print(top.values.tolist())
+
+    decoded = tokenizer.decode_tokens_bytes(top.indices.tolist())
+    values = top.values.tolist()
+    return decoded, values
 
 def save_qk_averages_for_head(head_weights, head):
     """ Compute and save the average qk value for each query. """
@@ -78,6 +81,19 @@ def save_qk_averages_for_head(head_weights, head):
         src = head_weights['w_e'].T @ qk
         qk_averages.append(src.mean())
     np.save(f"qk_avgs/head_{head}", np.array(qk_averages))
+
+
+def head_qk_ov_for_token(token, head_weights, embedding_weights, head, tokenizer):
+    """ Compute the qk and ov values for a single token. """
+    so = source_to_out(
+        token,
+        tokenizer=tokenizer,
+        head_weights=head_weights[head],
+        embedding_weights=embedding_weights,
+    )
+    sd = source_to_dest(token, tokenizer=tokenizer, head_weights=head_weights[head],
+                    embedding_weights=embedding_weights, head=head)
+    return {'source_to_out': so, 'source_to_dest': sd}
 
 
 if __name__=="__main__":
@@ -139,6 +155,7 @@ if __name__=="__main__":
     print()
     word = " perfect"
     print('word:', word)
+    tok = enc.encode(word)
 
     for h in range(n_heads):
         print()
@@ -147,14 +164,14 @@ if __name__=="__main__":
         # positional attention for head
         positional_attention_for_head(head_weights[h])
 
+        # qk and ov values for a single token
+        res = head_qk_ov_for_token(tok, head_weights, embedding_weights, h, enc)
+
         print("source to out")
-        source_to_out(
-            word,
-            tokenizer=enc,
-            head_weights=head_weights[h],
-            embedding_weights=embedding_weights,
-        )
+        print(res['source_to_out'][0])
+        print(res['source_to_out'][1])
+
         print("source to dest")
-        source_to_dest(source=word, tokenizer=enc, head_weights=head_weights[h],
-                       embedding_weights=embedding_weights, head=h)
+        print(res['source_to_dest'][0])
+        print(res['source_to_dest'][1])
 

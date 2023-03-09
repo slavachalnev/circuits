@@ -44,3 +44,9 @@ circuits
 ## Notable Differences
 - Tokenizer: I use the GPT-2 tokenizer. I don't know what tokenizer the paper used but it's definitely different.
 - Dataset: I use the OpenWebText dataset whereas the paper uses a mix of "Common Crawl data and internet books, along with a number of smaller distributions, including about 10% python code data"
+
+## TODO
+- Complete attention heads dump (OV/QK circuits for every token)
+- Scond layer eigenvalues
+- Term importance analysis
+- Publish checkpoints

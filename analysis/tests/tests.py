@@ -64,7 +64,7 @@ def test_split_heads():
     print(type(x))
 
     # load weights
-    weights = torch.load("../../from_odin/big_drop_2_10000.pt", map_location='cpu')
+    weights = torch.load("../../from_odin/big_drop_2_48000.pt", map_location='cpu')
     for weight in weights:
         print(weight, weights[weight].shape)
     

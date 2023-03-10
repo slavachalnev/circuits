@@ -18,8 +18,8 @@ class OneLayerAttnTransformer(Model):
         C.block_size = None
 
         # model dimensions
-        C.n_embd = 512
-        C.n_head = 8
+        C.n_embd = 768
+        C.n_head = 12
 
         # dropout hyperparameters
         C.pos_embd_pdrop = 0.0

@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import torch
 import tiktoken
@@ -7,13 +8,8 @@ from tqdm import tqdm
 
 from circuits.models.one_attn_layer import OneLayerAttnTransformer
 from circuits.train.train_one_layer import get_config
-from utils import positional_attention_for_head, get_weights_for_head, get_embedding_weights
-
-
-def get_eigenvalues(wh, we):
-    """ Get the eigenvalues for the w_v @ w_e @ w_u @ w_o matrix. """
-    m = wh['w_v'] @ we['w_e'] @ we['w_u'] @ wh['w_o']
-    return np.linalg.eigvals(m)
+from utils import positional_attention_for_head, get_weights_for_head, \
+                  get_embedding_weights, get_ov_eigenvalues
 
 
 def source_to_out(tok, tokenizer, head_weights, embedding_weights):
@@ -93,7 +89,11 @@ def head_qk_ov_for_token(token, head_weights, embedding_weights, head, tokenizer
     )
     sd = source_to_dest(token, tokenizer=tokenizer, head_weights=head_weights[head],
                     embedding_weights=embedding_weights, head=head)
-    return {'source_to_out': so, 'source_to_dest': sd}
+    
+    token_score = sd[1][0]*so[1][0]
+    return {'source_to_out': so,
+            'source_to_dest': sd,
+            'token_score': token_score}
 
 
 if __name__=="__main__":
@@ -135,7 +135,7 @@ if __name__=="__main__":
     # eigenvalues for each head
     graphs = []
     for head in range(n_heads):
-        eigen = get_eigenvalues(wh=head_weights[head], we=embedding_weights)
+        eigen = get_ov_eigenvalues(wh=head_weights[head], we=embedding_weights)
         xs = eigen.real
         ys = eigen.imag
         graphs.append((xs, ys))
@@ -174,4 +174,20 @@ if __name__=="__main__":
         print("source to dest")
         print(res['source_to_dest'][0])
         print(res['source_to_dest'][1])
+    
+    # compute qk and ov values for a every token for every head
+
+    qkov_per_head = []
+    for h in range(n_heads):
+        qkov_per_token = []
+        print("head", h)
+        for i in tqdm(range(enc.n_vocab)):
+            if i > 100:
+                break
+            res = head_qk_ov_for_token([i], head_weights, embedding_weights, h, enc)
+            qkov_per_token.append(res)
+        qkov_per_head.append(qkov_per_token)
+    
+    # print("saving")
+    # json.dump(qkov_per_head, open("qkov_per_head.json", "w"))
 

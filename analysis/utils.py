@@ -85,6 +85,14 @@ def get_embedding_weights(weights, d_model, norm_emb=False, final_layernorm=True
         'lnfb': lnfb,
     }
 
+def get_ov_eigenvalues(wh, we):
+    """
+    Get the eigenvalues for the w_u @ w_o @ w_v @ w_e matrix. Equivalent to
+    the eigenvalues of the w_v @ w_e @ w_u @ w_o matrix.
+    """
+    m = wh['w_v'] @ we['w_e'] @ we['w_u'] @ wh['w_o']
+    return np.linalg.eigvals(m)
+
 
 def positional_attention_for_head(head_weights, plot=False):
     """ compute matrix of preferred relative positions. """

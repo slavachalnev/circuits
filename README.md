@@ -21,6 +21,7 @@ circuits
 |   |-- one_layer.py                One layer circuits, \
 |   |                               skip-trigrams, eigenvalues
 |   |-- potter.html                 Harry Potter analysis
+|   |-- two_layer.md                Two layer results
 |   |-- two_layer.py                q, k, v composition,
 |   |                               attention visualisation
 |   |-- utils.py                    Tools to extract head weights
@@ -38,7 +39,7 @@ circuits
 |-- .gitignore                      
 |-- LICENCE                         MIT license
 |-- README.md
-
+|-- requirements.txt
 ```
 
 ## Notable Differences

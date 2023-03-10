@@ -50,6 +50,5 @@ circuits
 
 ## TODO
 - Complete attention heads dump (OV/QK values for every token)
-- Scond layer eigenvalues
 - Term importance analysis
 - Publish checkpoints

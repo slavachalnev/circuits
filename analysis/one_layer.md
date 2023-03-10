@@ -5,6 +5,18 @@
 ![OV Eigenvalues](assets/one_layer_eigen.png)
 We see that most of the heads are copying.
 
+### Skip Trigram Example
+```
+word:  perfect
+
+head 3
+source to out
+[b' perfect', b' flawless', b' perfection', b' strengths', b' satisfying']
+[0.8632295348542727, 0.6685081363494035, 0.5903501948812409, 0.5780806028328879, 0.5649582865571446]
+source to dest
+[b' a', b' is', b' very', b' are', b' was']
+[13.251565421938274, 12.97951749211745, 12.467596856219542, 12.402546378234636, 12.326935035483395]
+```
 
 ### Primarily Positional heads
 An example of a head which attends to relative positions.

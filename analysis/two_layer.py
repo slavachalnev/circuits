@@ -6,7 +6,9 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
 from circuits.train.train_two_layer import get_config
-from analysis.utils import get_weights_for_head, positional_attention_for_head, head_forward_pass
+from analysis.utils import get_weights_for_head, positional_attention_for_head, \
+                           head_forward_pass, get_embedding_weights, get_ov_eigenvalues, \
+                           get_qk_eigenvalues
 
 
 def k_composition(h_0, h_1):
@@ -110,26 +112,26 @@ def compute_qkv_composition(weights, n_heads, d_model):
     plt.show()
 
 
-def get_attention(weights, tokens, h_heads, d_model):
+def get_attention(weights, tokens, n_heads, d_model):
     """ Forward pass, return attention and value norms. """
 
     tokens = [50257] + tokens  # add start token
 
     layer_0 = []
-    for h in range(h_heads):
+    for h in range(n_heads):
         layer_0.append(get_weights_for_head(weights,
                                             layer=0,
                                             head=h,
-                                            n_heads=h_heads,
+                                            n_heads=n_heads,
                                             d_model=d_model,
                                             apply_layernorm=False,
                                             ))
     layer_1 = []
-    for h in range(h_heads):
+    for h in range(n_heads):
         layer_1.append(get_weights_for_head(weights,
                                             layer=1,
                                             head=h,
-                                            n_heads=h_heads,
+                                            n_heads=n_heads,
                                             d_model=d_model,
                                             apply_layernorm=False,
                                             ))
@@ -140,20 +142,20 @@ def get_attention(weights, tokens, h_heads, d_model):
     x_ln = x_ln * weights['b0.ln.weight'].numpy() + weights['b0.ln.bias'].numpy()
 
     layer_0_res = []
-    for h in range(h_heads):
+    for h in range(n_heads):
         layer_0_res.append(head_forward_pass(x_ln, layer_0[h]))
     
-    for h in range(h_heads):
+    for h in range(n_heads):
         x += layer_0_res[h][0]
     
     x_ln = (x - np.mean(x, axis=-1, keepdims=True)) / (np.std(x, axis=-1, keepdims=True) + 1e-5)
     x_ln = x_ln * weights['b1.ln.weight'].numpy() + weights['b1.ln.bias'].numpy()
 
     layer_1_res = []
-    for h in range(h_heads):
+    for h in range(n_heads):
         layer_1_res.append(head_forward_pass(x_ln, layer_1[h]))
     
-    for h in range(h_heads):
+    for h in range(n_heads):
         x += layer_1_res[h][0]
     
     attention = [out[1] for out in layer_0_res] + [out[1] for out in layer_1_res]
@@ -171,6 +173,66 @@ def get_attention(weights, tokens, h_heads, d_model):
         weighted_attn[i] /= np.max(weighted_attn[i])
 
     return weighted_attn
+
+def compute_eigenvalue_positivity(weights, n_heads, d_model):
+    layer_0 = []
+    for h in range(n_heads):
+        layer_0.append(get_weights_for_head(weights,
+                                            layer=0,
+                                            head=h,
+                                            n_heads=n_heads,
+                                            d_model=d_model,
+                                            apply_layernorm=True,
+                                            ))
+    layer_1 = []
+    for h in range(n_heads):
+        layer_1.append(get_weights_for_head(weights,
+                                            layer=1,
+                                            head=h,
+                                            n_heads=n_heads,
+                                            d_model=d_model,
+                                            apply_layernorm=True,
+                                            ))
+    embedding_weights = get_embedding_weights(weights, d_model=d_model,
+                                              norm_emb=False, final_layernorm=True)
+    
+    # ov positivity
+    ov_eigen_pos = []
+    for h in range(n_heads):
+        ov_eigen = get_ov_eigenvalues(wh=layer_1[h], we=embedding_weights)
+        r = ov_eigen.real
+        norms = []
+        for i in range(ov_eigen.shape[0]):
+            norms.append(np.linalg.norm(ov_eigen[i]))
+        ov_eigen_pos.append(np.sum(r) / np.sum(norms))
+    
+    # qk positivity
+    previous_token_head = 11 # We know l_0_h_11 is the previous token head
+    qk_eigen_pos = []
+    for h in range(n_heads):
+        qk_eigen = get_qk_eigenvalues(wh=layer_1[h],
+                                      wh_prev=layer_0[previous_token_head],
+                                      we=embedding_weights)
+        r = qk_eigen.real
+        norms = []
+        for i in range(qk_eigen.shape[0]):
+            norms.append(np.linalg.norm(qk_eigen[i]))
+        qk_eigen_pos.append(np.sum(r) / np.sum(norms))
+    
+    # We color the heads that we've previously identified as induction heads
+    colors = ['grey'] * 12
+    colors[3] = 'turquoise'
+    colors[7] = 'turquoise'
+    colors[9] = 'turquoise'
+
+    # plot qk vs ov
+    plt.scatter(ov_eigen_pos, qk_eigen_pos, c=colors)
+    plt.title("Second Layer Attention Heads by OV and QK Eigenvalue Positivity")
+    plt.xlabel("OV positivity")
+    plt.ylabel("QK positivity")
+    plt.xlim(-1, 1)
+    plt.ylim(-1, 1)
+    plt.show()
 
 
 def plot_attention_on_text(encoder, weights, n_heads, d_model):
@@ -213,3 +275,5 @@ if __name__=='__main__':
 
     compute_qkv_composition(weights, n_heads, d_model)
     # plot_attention_on_text(encoder=enc, weights=weights, n_heads=n_heads, d_model=d_model)
+
+    compute_eigenvalue_positivity(weights, n_heads, d_model)

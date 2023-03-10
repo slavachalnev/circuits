@@ -93,6 +93,16 @@ def get_ov_eigenvalues(wh, we):
     m = wh['w_v'] @ we['w_e'] @ we['w_u'] @ wh['w_o']
     return np.linalg.eigvals(m)
 
+def get_qk_eigenvalues(wh, wh_prev, we):
+    """
+    eigenvalues of
+    w_e w_q w_k w_o w_v w_e
+    is equivalent to eigenvalues of
+    w_v w_e w_e w_q w_k w_o
+    """
+    m = wh_prev['w_v'] @ we['w_e'] @ we['w_e'].T @ wh['w_q'].T @ wh['w_k'] @ wh_prev['w_o']
+    return np.linalg.eigvals(m)
+
 
 def positional_attention_for_head(head_weights, plot=False):
     """ compute matrix of preferred relative positions. """

@@ -13,8 +13,10 @@ https://slavachalnev.github.io/circuits/analysis/potter.html
 circuits
 |-- analysis                        Reproduce graphs and tables
 |   |-- assets                      Images of plots
-|   |   |-- one_layer_eigen.png     Eigenvalue plot
 |   |   |-- head_11_pos.png         Positional attention head
+|   |   |-- induction_heads.png     QKV composition
+|   |   |-- one_layer_eigen.png     Eigenvalue plot
+|   |   |-- two_layer_eigen.png     Eigenvalue positivity
 |   |-- tests                       Test analysis tools
 |   |   |-- tests.py                Test weight extractor
 |   |-- one_layer.md                One layer results
